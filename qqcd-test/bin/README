@@ -1,0 +1,16 @@
+IMPORTANT INFO
+
+In the job_sub.sh file:
+
+Replace "YOUR_EMAIL@baylor.edu with your Baylor email. This will send you an email when your calculation has finished running
+
+Replace YOURKODIAKUSER with your kodiak username in the file path to remove scratch files
+
+Replace scratch with the desired name of the directory in the file path to remove scratch files
+
+If these files are not being output by the program, then place ## in front of rm to comment them out
+and remove the output to the error file
+
+Note: (# of nodes)*(processors per node) MUST be equal to npx*npy*npz*npt as set in qqcd-test/user/latdims.f90
+
+-Travis

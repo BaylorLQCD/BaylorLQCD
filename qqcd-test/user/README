@@ -1,0 +1,20 @@
+IMPORTANT INFO
+
+In the cfgspropsmain.f90 file:
+
+Replace YOURKODIAKUSER with your kodiak user name, and scratch with the name of the desired directory you would like your data output to in
+
+rwdir = "/data/YOURKODIAKUSER/qqcd/scratch/"
+
+This makes sure that the data output by the program is output to your data directory in the directory you replace scratch with
+
+If you are starting from scratch you will have to "mkdir qqcd" in your data directory.
+Within qqcd, use mkdir again to create a directory with the name of your choosing. This is where your data will be output to. This directory must have the same name as the directory you specify in
+
+/qqcd-test/bin/job_sub.sh
+
+for removing the scratch files
+
+Within this directory, use "mkdir cfgfiles". Your configuration and lagfib files MUST be placed in the cfgfiles directory!!
+
+-Travis

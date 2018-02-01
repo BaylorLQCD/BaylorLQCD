@@ -1511,8 +1511,11 @@ subroutine eigmodesLAPACK(mat,m,mode,eval,evec)
 !print *, 'rtol =',rtol
 !endif
 
+<<<<<<< HEAD
 !accept this change! -TW 1/31/18
 
+=======
+>>>>>>> 8ee59fc17cd68c1023948929d65e02f2f29fb6b7
 
   ! ignore initial guess and use 0
   !xe(:6,:ntotal,:4,:2,:8) = 0.0_KR2

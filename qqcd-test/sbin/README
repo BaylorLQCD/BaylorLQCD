@@ -1,6 +1,6 @@
 VERY IMPORTANT
 
-After forking this directory and cloning it to your home directory, be sure
+After forking the BaylorLQCD repository and cloning it to your home directory, be sure
 to go to "/home/BaylorLQCD/qqcd-test/sbin" and "mkdir objs" or the code will not compile!!!
 
 -Travis
