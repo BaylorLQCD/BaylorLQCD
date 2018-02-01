@@ -2205,7 +2205,6 @@ endif
                        lvcl,ib,lbd,iblv,rwdir,MRT,MRT2,nGMRESeig)
 
 
-!reject this change!!! -TW 1/31/18
 
 
 !!!!!!!!********BS Printing of eigenvector starts here .. To print just change
