@@ -1511,7 +1511,7 @@ subroutine eigmodesLAPACK(mat,m,mode,eval,evec)
 !print *, 'rtol =',rtol
 !endif
 
-
+!accept this change! -TW 1/31/18
 
 
   ! ignore initial guess and use 0
