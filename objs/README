@@ -1,0 +1,3 @@
+Once you have forked and cloned this directory, move this objs directory to the sbin directory, or your code will not compile
+
+-Travis
