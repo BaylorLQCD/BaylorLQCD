@@ -1,0 +1,29 @@
+Here are some notes about the functions in disconloops.f90 in regard to
+combining perturbative and eig subtraction methods.
+
+(Abdou 10/01/2012)
+
+
+1. generalaverage
+
+   I think this function is what we need (should use) for computing the 
+   first line in equations 4.84 and 4.87. We should make sure it is complete.
+   It requires as an input the left and right eigenvecctors of the dirac 
+   operator and the eigenvectors of the gamma5*Dirac operator. 
+
+   This function calls nsaverage (non-subtracted average), eigaverage (eigen subtracted average),
+   and average (perturbative subtracted average). I beleive the first task to make sure that 
+   this part is well done and tested.
+
+
+2. I think testFUNC is the function that plays the role of discon. I also think eigdiscon 
+   should be the one called instead of testFUNC, but it looks like eigdiscon was not fully
+   developed yet.  
+  
+   So, I recommend we prepare these two interface functions testFUNC and generalaverage, also 
+   there will be a vev function later to come. This vev function will compute the second lines
+   of equations 4.84 and 4.87. HOWEVER, the vev is independent of the noise and thus is not important
+   when we look at the errors only. It is not implemented in the code now but will need to be 
+   implemeneted to use this method in a physics computation. 
+
+    
