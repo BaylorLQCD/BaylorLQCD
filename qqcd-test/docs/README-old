@@ -1,0 +1,22 @@
+========================
+README for qqcd package.
+========================
+
+Typical use of these routines, is as follows:
+
+1. Edit the files in the ./user directory.
+2. Be sure your computer is included in ./sbin/compile .
+3. Execute ./sbin/compile (from the main qqcd directory).
+4. Execute one of: ./bin/translator
+                   mpirun -np 12 ./bin/cfgsprops
+
+--------
+
+
+./glue/mpinull.f90 is an F-compatible nonfunctional replacement
+for the true MPI module, useful for testing compilability.
+NOTE: MPI calls are inherently not F compliant.
+      These qqcd routines will compile with F and run in single processor mode
+      if KR=KR2 in ./user/kinds
+      For KR<>KR2, the two MPI calls in subroutine vecdot will need to be
+      commented out before the codes will compile with F.

@@ -1,0 +1,2056 @@
+37,39d36
+< !xxxxxxxxxxxxxxxxxxxxx
+< !note: we will add iop=6..9 for the local vector current (abdou 04/22/13)
+< !xxxxxxxxxxxxxxxxxxxxx
+42c39
+< !                    (iri,iop)=(1,1) is factor*Im(J_1) !is there a typo here and this was supposed to be Re(J_1). Similarly below?. -abdou 4/22/13
+---
+> !                    (iri,iop)=(1,1) is factor*Im(J_1)
+66a64,75
+> !---------Changes made to the module----------------------------------------
+> !
+> !July, 5th, 2007 changes made by Abdou
+> !
+> !In order to include the 4 components of the point-split axial current in the 
+> !loop calculation we need to change nop from 6 to 10 in twistdiscon where nop
+> !is coded as a parameter. The convention that will be used is that nop=7 for
+> !the time component and nop=8-10 for x,y,z components respectively.
+> !---------------------------------------------------------------------------
+> 
+> 
+> 
+85a95
+>      use pseudolapack
+93,97c103,107
+<      public  :: discon, twistdiscon, z2source, eigdiscon, z4source, testFUNC, testFUNC_abdou
+<      private :: vev, average, loopops, mulfor2,mulfor3,mulbac2,mulbac3, vv, vgv, momfacs, &
+<                 spacesum, checknonzero, fakegauge,  eigaverage, eigaverage_abdou, eigloopops, eigloopops_abdou, eigspacesum,  &
+<                 eigmodesofM, eigmodesofMprime, xigenerator, vevoutput, generalaverage, generalaverage_abdou,   &
+<                 printz2noise, nsaverage, nsaverage_abdou
+---
+>      public  :: discon, twistdiscon, z2source, eigdiscon, z4source, testFUNC
+>      private :: vev, average, ppaverage, averagePRIME, loopops, mulfor2,mulfor3,mulbac2,mulbac3, vv, vgv, momfacs, &
+>                 spacesum, checknonzero, fakegauge,  eigaverage, eigloopops, eigloopops_original, eigspacesum,  &
+>                 eigmodesofM, eigmodesofMprime, xigenerator, vevoutput, generalaverage,    &
+>                 printz2noise, nsaverage
+102a113,115
+> ! general average seems to be doing the various subtraction combinations 
+> ! at zero momentum and printing them out. It uses nsaverage, eigaverage, 
+> ! and average. --AA
+109c122
+<                            iblv,rwdir,MRT2)
+---
+>                            iblv,rwdir,MRT,MRT2)
+130c143
+<  integer(kind=KI), intent(in)                            :: myid, MRT2
+---
+>  integer(kind=KI), intent(in)                            :: myid, MRT2, MRT
+134c147
+<  integer(kind=KI), parameter                 :: nsub=6, nmom=5, nop=9, nsty=6     !why nmom=6 -AA
+---
+>  integer(kind=KI), parameter                 :: nsub=6, nmom=5, nop=9, nsty=6
+148,149c161,162
+<   
+<  !real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: gz2e,gz2o  !added by Abdou Feb. 18th, 2013
+---
+>  real(kind=KR2),  dimension(6,ntotal,4,2,8)         :: gz2e,gz2o !added by Abdou
+> 
+151c164
+<  integer(kind=KI), dimension(3)                      :: io
+---
+> !calculate gamma5*z
+152a166,170
+> do ieo=1,2
+>    do ibleo =1,8
+>      call gammamult(z2e, z2o, gz2e, gz2o, 5,ieo,ibleo)
+>    enddo
+> enddo
+164d181
+< 
+187c204
+< call average(JavePS,nsub,nmom,nop,momfac,u,z2e,z2o,ZERO_E,ZERO_O,kappa(1), &
+---
+>  call average(JavePS,nsub,nmom,nop,momfac,u,gz2e,gz2o,ZERO_E,ZERO_O,kappa(1), &
+189,191c206
+<               iblv,rwdir,MRT2)
+< 
+< JavePS = - JavePS
+---
+>               iblv,rwdir,MRT2)!To use ppaverage,change kappa(1) to kappa and add                               MRT to the list
+193a209,210
+>  JavePS = -JavePS 
+> 
+239,333d255
+< !-------------------------------------------------------------------------------------------------
+< 
+< !same as generalaverage but I use it for testing the modifcations --Abdou
+< !Changes relative to generalaverage:
+< !  -call nsaverage_abdou
+< 
+<  subroutine generalaverage_abdou(Jave,numEV,numEVP,eigstart,eigstep,u,z2e,z2o,xe,xo,kappa, &
+<                            evecReven,evecRodd,evecLeven,evecLodd,scalarMultiplier,   &
+<                            evecRevenP,evecRoddP,scalarMultiplierP,                   &
+<                            xiinvscalarMultiplier,xiinvscalarMultiplierPRIME,         &
+<                            coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,     &
+<                            iblv,rwdir,MRT2)
+<  real(kind=KR),    intent(out),   dimension(:,:,:,:,:,:) :: Jave
+<  integer(kind=KI), intent(in)                            :: numEV,numEVP
+<  integer(kind=KI), intent(in)                            :: eigstart, eigstep
+<  real(kind=KR),    intent(inout), dimension(:,:,:,:,:)   :: u
+<  real(kind=KR),    intent(in),    dimension(:)           :: kappa
+<  real(kind=KR),    intent(inout), dimension(:,:,:,:,:)   :: z2e, z2o
+<  real(kind=KR),    intent(inout), dimension(:,:,:,:,:)   :: xe, xo
+<  real(kind=KR2),   intent(in),    dimension(:,:,:,:,:,:) :: evecReven, evecRodd
+<  real(kind=KR2),   intent(in),    dimension(:,:,:,:,:,:) :: evecLeven, evecLodd
+<  real(kind=KR2),   intent(in),    dimension(:,:,:,:,:,:) :: evecRevenP, evecRoddP
+<  real(kind=KR2),   intent(in),    dimension(:,:)         :: scalarMultiplier,scalarMultiplierP
+<  real(kind=KR2),   intent(in),    dimension(:,:,:)       :: xiinvscalarMultiplier,xiinvscalarMultiplierPRIME 
+<  real(kind=KR),    intent(in),    dimension(:,:,:)       :: coact
+<  integer(kind=KI), intent(in),    dimension(:)           :: bc, nms
+<  integer(kind=KI), intent(in),    dimension(:,:)         :: vecbl, vecblinv
+<  integer(kind=KI), intent(in),    dimension(:,:)         :: nn, iblv
+<  logical,          intent(in),    dimension(:)           :: ldiv
+<  integer(kind=KI), intent(in),    dimension(:,:,:)       :: lvbc
+<  integer(kind=KI), intent(in),    dimension(:,:,:,:)     :: ib
+<  logical,          intent(in),    dimension(:,:)         :: lbd
+<  integer(kind=KI), intent(in)                            :: myid, MRT2
+<  character(len=*), intent(in),    dimension(:)           :: rwdir
+< 
+< ! integer(kind=KI), parameter                 :: nsub=6, nmom=5, nop=5, nsty=6
+<  integer(kind=KI), parameter                 :: nsub=6, nmom=5, nop=9, nsty=6
+<  real(kind=KR),    dimension(2,ntotal,4,2,8) :: ZERO_E=0.0_KR2, ZERO_O=0.0_KR2
+< 
+<  real(kind=KR2),   dimension(2,nt,nmom,nop)                :: JaveNS                             
+<  real(kind=KR),    dimension(2,nt,kmaxGMRES,nmom,nop)      :: JaveES
+<  real(kind=KR),    dimension(2,nt,kmaxGMRES,nmom,nop)      :: JaveHFES
+<  real(kind=KR2),   dimension(2,nt,nsub,nmom,nop)           :: JavePS
+<  real(kind=KR2),   dimension(2,nt,nsub,kmaxGMRES,nmom,nop) :: JaveESPS
+<  real(kind=KR2),   dimension(2,nt,nsub,kmaxGMRES,nmom,nop) :: JaveHFESPS
+< 
+<  integer(kind=KI)                                   :: numEV_MAX, ieo, ibleo
+<  integer(kind=KI)                                   :: isub, imom, eig, sty
+<  real(kind=KR2),  dimension(nvhalf,2,16,nmom-1,nop) :: momfac
+<  integer(kind=KI)                                   :: dobndry = 0
+<   
+<  real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: gz2e,gz2o  !added by Abdou Feb. 18th, 2013
+< 
+<  integer(kind=KI), dimension(3)                      :: io
+< 
+< 
+<  !calculate gamma5*z
+<  do ieo=1,2
+<     do ibleo=1,8
+<        call gammamult(z2e, z2o, gz2e, gz2o, 5,ieo,ibleo)
+<     enddo
+<  enddo
+< 
+< 
+<  ! Initalize data
+<  momfac     = 0.0_KR2
+<  JaveNS     = 0.0_KR2
+<  JaveES     = 0.0_KR2
+<  JaveHFES   = 0.0_KR2
+<  JavePS     = 0.0_KR2
+<  JaveESPS   = 0.0_KR2
+<  JaveHFESPS = 0.0_KR2
+< 
+< 
+<  ! non subtraction (NOTE: using the x' solutions)
+<  call nsaverage_abdou(JaveNS,u,z2e,z2o,xe,xo,kappa(1),coact,bc,vecbl,       &
+<                 vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT2,2_KI)
+< 
+<  ! eig subtraction
+<  call eigaverage_abdou(JaveES,numEV,eigstart,eigstep,u,z2e,z2o,xe,xo,kappa(1), &
+<                  evecReven,evecRodd,evecLeven,evecLodd,scalarMultiplier, &
+<                  coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,   &
+<                  iblv,MRT2,1_KI)
+< 
+<  ! hermitian forced eig subtraction
+<  call eigaverage_abdou(JaveHFES,numEVP,eigstart,eigstep,u,z2e,z2o,xe,xo,kappa(1),   &
+<                  evecRevenP,evecRoddP,evecRevenP,evecRoddP,scalarMultiplierP, &
+<                  coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,        &
+<                  iblv,MRT2,2_KI)
+< 
+<  ! pert subtraction
+<  ! inorder to account for the "different" solution vector x' => gamma5Mx' = z
+<  ! instead of x => Mx=z a zero vector is being passed in to calulate the subtraction 
+<  ! correction term of the perturbative case. The subtraction is done explicity in the
+<  ! next step. Note that the minus is in the correction calculation.
+335,350d256
+< !test the effect of passing g5z2e and g5z2o to average. I think this is the correct way to do it
+< !call average(JavePS,nsub,nmom,nop,momfac,u,z2e,z2o,ZERO_E,ZERO_O,kappa(1), &
+< !              dobndry,coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd, &
+< !              iblv,rwdir,MRT2)
+< call average(JavePS,nsub,nmom,nop,momfac,u,gz2e,gz2o,ZERO_E,ZERO_O,kappa(1), &
+<               dobndry,coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd, &
+<               iblv,rwdir,MRT2)
+< 
+< JavePS = - JavePS
+< 
+<  
+<  do isub=1,nsub
+<    ! eig subtraction for ES+PS
+<    call eigaverage_abdou(JaveESPS(:,:,isub,:,:,:),numEV,eigstart,eigstep,u,z2e,z2o,xe,xo,kappa(1), &
+<                    evecReven,evecRodd,evecLeven,evecLodd,xiinvscalarMultiplier(:,isub,:),    &
+<                    coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT2,1_KI)
+352,357d257
+<    ! hermitian forced eig subtraction for HFES+PS
+<    call eigaverage_abdou(JaveHFESPS(:,:,isub,:,:,:),numEVP,eigstart,eigstep,u,z2e,z2o,xe,xo,kappa(1),    &
+<                    evecRevenP,evecRoddP,evecRevenP,evecRoddP,xiinvscalarMultiplierPRIME(:,isub,:), &
+<                    coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT2,2_KI)
+<  enddo
+<  
+359,388c259
+<  ! COPY INTO FINAL HOLDER
+<  imom = 1 ! doing 0 momentum calculations
+<  numEV_MAX = max(numEV,numEVP)
+<  do isub=1,nsub
+<    do eig=1,numEV_MAX
+<      do sty=1,6
+<        ! sty = 1  NS
+<        if (sty==1 .and. eig==1 .and. isub==1) then
+<          Jave(:,:,isub,eig,sty,:) = JaveNS(:,:,imom,:)
+<        ! sty = 2  PS
+<        else if (sty==2 .and. eig==1) then
+<          Jave(:,:,isub,eig,sty,:) = JaveNS(:,:,imom,:) - JavePS(:,:,isub,imom,:)
+<        ! sty = 3  ES
+<        else if (sty==3 .and. isub==1) then
+<          Jave(:,:,isub,eig,sty,:) = JaveNS(:,:,imom,:) - JaveES(:,:,eig,imom,:)
+<        ! sty = 4  HFES
+<        else if (sty==4 .and. isub==1) then
+<          Jave(:,:,isub,eig,sty,:) = JaveNS(:,:,imom,:) - JaveHFES(:,:,eig,imom,:)
+<        ! sty = 5  ES+PS
+<        else if (sty==5) then
+<          Jave(:,:,isub,eig,sty,:) = JaveNS(:,:,imom,:) - JaveES(:,:,eig,imom,:)    &
+<                                   - (JavePS(:,:,isub,imom,:) - JaveESPS(:,:,isub,eig,imom,:)) 
+<        ! sty = 6  HFES+PS
+<        else if (sty==6) then
+<          Jave(:,:,isub,eig,sty,:) = JaveNS(:,:,imom,:)  - JaveHFES(:,:,eig,imom,:) &
+<                                   - (JavePS(:,:,isub,imom,:) - JaveHFESPS(:,:,isub,eig,imom,:))
+<        endif
+<      enddo
+<    enddo
+<  enddo
+---
+> ! vevoutput seems to be just a function to printout the output for loop calculations -AA
+390,393d260
+<  end subroutine generalaverage_abdou
+< !-------------------------------------------------------------------------------------------------
+< !----------------------------------------------------------------------------------------------------
+< !vevoutput: a function to printout the output for loop calculations -Abdou
+774c641
+<    elseif (evalue(2,eig) > 0) then       ! a+bi 
+---
+>    elseif (evalue(2,eig) > 0) then       ! a+bi
+1048c915,918
+< !----------------------------------------------------------------------------------------------------
+---
+> 
+> 
+> 
+> 
+1072,1073c942,943
+<  real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: gxe,gxo  
+<  real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: z2e, z2o,gz2e,gz2o 
+---
+>  real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: gxe,gxo
+>  real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: z2e, z2o,gz2e,gz2o
+1174,1175c1044,1046
+<  resmax = 1e-8_KR2
+<  inverter = 6 ! use gmresdr/gmresproj
+---
+>  resmax = 1e-7_KR2
+> ! inverter = 6 ! use gmresdr/gmresproj
+>  inverter = 0!use bicgstab,abdou's suggestion,it seems psc doesn't converge
+1180,1182c1051
+<  idag=0
+< 
+<  ! sets rhs for gmresdr in fermprop (2 means use gmres project)
+---
+>  ! sets rhs for gmresdr in fermprop
+1207d1075
+<    !call z2source(z2e,z2o,nvhalf)
+1216,1219d1083
+<    if(myid==0) then
+<      write(*,*)'kappa used in fermprop:   ',kappa(1)
+<    endif
+<      
+1230d1093
+<    idag=0
+1249,1255c1112
+<      if (myid==0) write(*,*) 'residual: ',tmp2(1)
+<      call vecdot(gz2e,gz2e,tmp1,MRT2)
+<      call vecdot(gz2o,gz2o,tmp2,MRT2)
+<      tmp1 = tmp1 + tmp2
+<      call cmpxsqrt(tmp1, tmp2)
+< 
+<      if (myid==0) write(*,*) 'intial residual: ',tmp2(1)
+---
+>      if (myid==0) write(*,*) 'residual(inv=0): ',tmp2(1)
+1262c1119
+<                        coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,rwdir,MRT2)
+---
+>                        coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,rwdir,MRT,MRT2)
+1276,1332d1132
+< !------------------------------------------------------------------------------------------------------------
+< 
+< subroutine testFUNC_abdou(u,kappa,nrhs,coact,bc,vecbl,vecblinv,myid,ntmqcd,nn,ldiv, &
+<                           nms,lvbc,lvcl,ib,lbd,iblv,rwdir,MRT,MRT2,numprocs)
+< !same as testFUNC but I use this for testing my changes --Abdou
+< !Changes relative to testFUNC:
+< !    -use of generalaverage_abdou
+< !
+< !
+< 
+< !Here we go, begining of serious checking of the codes
+< ! Abdou, June 24th, 2013
+< 
+< !********************************************************************************************
+< !*******************************************************************************************
+< !This is is calling section from cfgsprops/cfgsprops.f90
+< !WARNING WARNING WARNNING:  NEVER UNCOMMENT THIS BECUASE IT DOESN't BELONG HERE
+< !THIS IS JUST TO SEE THINSG CLEARLY FROM THE CALLING PROGRAM
+< !======================================================================================
+< ! if (numnoises>0) then
+< !   do ikappa = 1,1
+< !      mudelta  = 0.0_KR
+< !      muWilson = 0.0_KR
+< !      ntm = abs(ntmqcdloop)
+< !      call testFUNC_abdou(u,kappa,numnoises,coact,bc,vecbl,vecblinv,myid,ntm,nn,ldiv, &
+< !                              nms,lvbc,lv,ib,lbd,iblv,rwdir,MRT,MRT2,numprocs)
+< !  enddo ! ikappa
+< ! endif ! check numnoises
+< !
+< ! The gauge links and the fermion fields are of the following dimensions.
+< !    allocate(u(18,ntotal,4,2,16))
+< !    allocate(xe(6,ntotal,4,2,8,nshifts))
+< !    allocate(xo(6,ntotal,4,2,8,nshifts))
+< !    allocate(be(6,ntotal,4,2,8))
+< !    allocate(bo(6,ntotal,4,2,8))
+< !
+< !
+< ! kappa(9) , It is set that kappa(1) =0.155 and the remaining elements are zero
+< ! numnoises=20 
+< ! ntm = abs(ntmqcdloop)=0
+< ! The rest of the input parameters are for geometry and communications so it should be ok.
+< !*******************************************************************************************
+< !Input/output paramaeters
+<  real(kind=KR),    intent(inout), dimension(:,:,:,:,:) :: u !This should be input only but I don't think we ever change the gauge field in these routines
+<  real(kind=KR),    intent(in),    dimension(:)         :: kappa
+<  integer(kind=KI), intent(in)                          :: nrhs
+<  character(len=*), intent(in),    dimension(:)         :: rwdir
+<  integer(kind=KI), intent(in),    dimension(:)         :: bc, nms
+<  integer(kind=KI), intent(in)                          :: myid, MRT,MRT2,numprocs
+<  real(kind=KR),    intent(in),    dimension(:,:,:)     :: coact
+<  integer(kind=KI), intent(in),    dimension(:,:)       :: vecbl, vecblinv
+<  integer(kind=KI), intent(in),    dimension(:,:)       :: nn, iblv
+<  logical,          intent(in),    dimension(:)         :: ldiv
+<  integer(kind=KI), intent(in),    dimension(:,:,:)     :: lvbc, lvcl
+<  integer(kind=KI), intent(in),    dimension(:,:,:,:)   :: ib
+<  logical,          intent(in),    dimension(:,:)       :: lbd
+<  integer(kind=KI), intent(in)                          :: ntmqcd
+1336,1346c1136,1147
+< !local variables
+< !----------------
+<  integer(kind=KI)                             :: i,j,k;
+<  integer(kind=KI)                             :: ieo,ibleo,idag,ierr
+<  integer(kind=KI)                             :: eig,irhs
+<  real(kind=KR2),  dimension(2)                :: tmp1, tmp2
+< 
+<  real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: tmpE,tmpO
+<  real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: gxe,gxo  
+<  real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: z2e, z2o,gz2e,gz2o 
+<  real(kind=KR2),  dimension(6,ntotal,4,2,8,1) :: xeTMP,xoTMP
+---
+>  subroutine eigmodesofMprime(evectorRevnPRIME,evectorRoddPRIME,eigValExpandPRIME,numEVPRIME, &
+>                              u,kappa,coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,          &
+>                              lvcl,ib,lbd,iblv,rwdir,MRT,MRT2,nGMRES)
+>    use shift
+>    real(kind=KR),    intent(out), dimension(:,:,:,:,:,:) :: evectorRevnPRIME, evectorRoddPRIME
+>    real(kind=KR),    intent(out), dimension(:)           :: eigValExpandPRIME
+>    integer(kind=KI), intent(out)                         :: numEVPRIME
+>    real(kind=KR),    intent(inout), dimension(:,:,:,:,:) :: u
+>    real(kind=KR),    intent(in),    dimension(:)         :: kappa
+>    !! --- Identify number of eigenmodes to be calculated --- !!
+>    integer(kind=KI), intent(in),    dimension(:)         :: nGMRES
+>    
+1348,1353c1149,1158
+<  ! GMRES Variables
+<  integer(kind=KI), dimension(2)                :: nGMRES,nGMRESeig
+<  integer(kind=KI)                              :: itermin, iflag, inverter, isignal, mvp
+<  real(kind=KR),    dimension(2,kmaxGMRES)      :: gdr
+<  real(kind=KR)                                 :: resmax
+<  real(kind=KR),    dimension(18,nvhalf,8,2,16) :: GeeGooinv 
+---
+>    character(len=*), intent(in),    dimension(:)         :: rwdir
+>    integer(kind=KI), intent(in),    dimension(:)         :: bc, nms
+>    integer(kind=KI), intent(in)                          :: myid, MRT,MRT2
+>    real(kind=KR),    intent(in),    dimension(:,:,:)     :: coact
+>    integer(kind=KI), intent(in),    dimension(:,:)       :: vecbl, vecblinv
+>    integer(kind=KI), intent(in),    dimension(:,:)       :: nn, iblv
+>    logical,          intent(in),    dimension(:)         :: ldiv
+>    integer(kind=KI), intent(in),    dimension(:,:,:)     :: lvbc, lvcl
+>    integer(kind=KI), intent(in),    dimension(:,:,:,:)   :: ib
+>    logical,          intent(in),    dimension(:,:)       :: lbd
+1355,1356d1159
+< ! integer(kind=KI), parameter :: nop=5, nsty=6, eigstart=1, eigstep=5, ksub=6
+<  integer(kind=KI), parameter  :: nop=9, nsty=6, eigstart=1, eigstep=1, ksub=6  !Let's collect more data with each new eigenvector
+1358,1369c1161,1175
+< !NOTE: kmaxGMRES and nmaxGMRES are defined in latdims.f90 and their values are 200 and 210 respectively
+<  real(kind=KR),   dimension(6,ntotal,4,2,8,kmaxGMRES) :: evectorRevnPRIME, evectorRoddPRIME
+<  real(kind=KR),   dimension(6,ntotal,4,2,8,kmaxGMRES) :: evectorRevn, evectorRodd
+<  real(kind=KR),   dimension(6,ntotal,4,2,8,kmaxGMRES) :: evectorLevn, evectorLodd
+<  real(kind=KR),   dimension(kmaxGMRES)                :: eigValExpandPRIME
+<  real(kind=KR),   dimension(2,kmaxGMRES)              :: eigValExpand
+<  integer(kind=KI)                                     :: numEVPRIME,numEV
+<  real(kind=KR),   dimension(2,kmaxGMRES)              :: inv_lam, inv_xi
+<  real(kind=KR),   dimension(2,kmaxGMRES)              :: inv_lamPRIME, inv_xiPRIME
+<  real(kind=KR2),  dimension(2,ksub,kmaxGMRES)         :: xiinv,xiinvPRIME
+<  
+<  real(kind=KR2),  dimension(2,nt,ksub,kmaxGMRES,nsty,nop) :: Jvev,Jave,Jtotal
+---
+>    real(kind=KR), dimension(kmaxGMRES)          :: evalueNORM
+>    integer(kind=KI)                             :: irhs,j,ii,nv,gblclr
+>    integer(kind=KI)                             :: idag, ierr
+>    real(kind=KR2),  dimension(2)                :: dottmp1,dottmp2
+>    real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: xe, xo
+>    real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: b,tmpE,bepart
+>    real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: z2e, z2o, tmpO
+>    real(kind=KR2),  dimension(6,ntotal,4,2,8) :: xeTMP,xoTMP
+>    real(kind=KR2),  dimension(6,ntotal,4,2,8,2*kmaxGMRES) :: evectorODD,evectorODDL
+>    real(kind=KR2),  dimension(6,ntotal,4,2,8,2*kmaxGMRES) :: evectorL,evectorR
+>    real(kind=KR2),  dimension(2,kmaxGMRES)      :: evalueTMP
+>    real(kind=KR2),  dimension(2,2*kmaxGMRES)    :: eigValExpand,eigValExpandLEFT
+>    real(kind=KR2),  dimension(2,kmaxGMRES*2)    :: scalarMultiplier
+>    integer,         dimension(kmaxGMRES)        :: ind,ind2
+>    real(kind=KR2),  dimension(2)                :: tmp1, tmp2, tmp3, tmp4
+1370a1177,1181
+>    ! GMRES Variables
+>    integer(kind=KI)                           :: itermin, iflag, inverter
+>    real(kind=KR)                              :: resmax,constt
+>    integer(kind=KI)                           :: itercount, LUcount
+>    real(kind=KR), dimension(18,nvhalf,8,2,16) :: GeeGooinv
+1371a1183,1189
+>    real(kind=KR), dimension(6,ntotal,4,2,8)   :: bopart
+>    integer(kind=KI)                           :: iaa,ibb,icc,eigtest,eig,eigKEEP,eigVecKEEP,id
+>    integer(kind=KI)                           :: ieo,iop,sty,it,styindx,ibleo
+>    integer(kind=KI)                           :: numEV,evStrt,evEnd
+>    real(kind=KR)                              :: tmp,tmpReal,tmpImag
+>    integer(kind=KI)                           :: dim1, dim2,dim3,dim4
+>    integer(kind=KI)                           :: fullruns,styprint
+1373,1383c1191,1195
+<  !Test that the input variables are correct
+<  if(myid==0) then
+<      open(unit=11,file=trim(rwdir(myid+1))//"testFUNC_abdou.LOG",action="write",&
+<           form="formatted",status="replace")
+<      do  i=1,9
+<          write(unit=11,fmt=*)"i   kappa=", i , kappa(i)
+<      enddo
+<      write(unit=11,fmt=*)"nrhs=",nrhs
+<      write(unit=11,fmt=*)"ntmqcd=",ntmqcd
+<  endif
+<     
+---
+>    ! initialize/declare vairable parameters
+>    idag = 0; ! guarentees Mx not Mdagx
+>    itermin = 10
+>    iflag = -1  ! Wilson
+>    GeeGooinv = 0.0_KR2
+1384a1197,1198
+>    ! a throw away right hand side
+>    call z4source(z2e,z2o,nvhalf,myid)
+1386,1628c1200,1205
+< 
+<    
+<  ! Prime files for output
+<  if (myid==0) then
+<    open(unit=21,file=trim(rwdir(myid+1))//"ns.dat",status="new",     &
+<         action="write",form="formatted")
+<    close(unit=21,status="keep")
+<    open(unit=22,file=trim(rwdir(myid+1))//"ps.dat",status="new",     &
+<         action="write",form="formatted")
+<    close(unit=22,status="keep")
+<    open(unit=23,file=trim(rwdir(myid+1))//"es.dat",status="new",     &
+<         action="write",form="formatted")
+<    close(unit=23,status="keep")
+<    open(unit=24,file=trim(rwdir(myid+1))//"hfes.dat",status="new",   &
+<         action="write",form="formatted")
+<    close(unit=24,status="keep")
+<    open(unit=25,file=trim(rwdir(myid+1))//"esps.dat",status="new",   &
+<         action="write",form="formatted")
+<    close(unit=25,status="keep")
+<    open(unit=26,file=trim(rwdir(myid+1))//"hfesps.dat",status="new", &
+<         action="write",form="formatted")
+<    close(unit=26,status="keep")
+<  endif
+< 
+<  ! Idenfity number of Eigmodes to try to calculate
+<  nGMRESeig(1) = 80 !400
+<  nGMRESeig(2) = 50  !350
+< 
+<  !!!!       --- Gather eigenmode information ---      !!!!
+<  ! eigenmode info for M' = gamma5 M
+<  call eigmodesofMprime(evectorRevnPRIME,evectorRoddPRIME,eigValExpandPRIME,numEVPRIME, &
+<                        u,kappa,coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,          &
+<                        lvcl,ib,lbd,iblv,rwdir,MRT,MRT2,nGMRESeig)
+< 
+<  ! eigenmode info for M
+<  call eigmodesofM(evectorRevn,evectorRodd,evectorLevn, evectorLodd,eigValExpand,numEV, &
+<                   u,kappa,coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,               &
+<                   lvcl,ib,lbd,iblv,rwdir,MRT,MRT2,nGMRESeig)
+<  ! make 1/xi 
+<  call xigenerator(xiinv,numEV,eigstart,eigstep,u,kappa(1),                             &
+<                   evectorRevn,evectorRodd,evectorLevn,evectorLodd,                     &
+<                   coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT2,1_KI)
+< 
+<  ! make 1/xiprime 
+<  call xigenerator(xiinvPRIME,numEVPRIME,eigstart,eigstep,u,kappa(1),                   &
+<                   evectorRevnPRIME,evectorRoddPRIME,evectorRevnPRIME,evectorRoddPRIME, &
+<                   coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT2,2_KI)
+< 
+< 
+<  ! --  output -- !
+<  if (myid==0) then
+<    write(*,*) 'NUMEV:         ',numEV
+<    write(*,*) 'NUMEVPRIME:    ',numEVPRIME
+<    write(*,*) 'eigstart:      ',eigstart
+<    write(*,*) 'eigstep:       ',eigstep
+<    write(*,*)
+<    write(*,*)
+<    write(*,*) '--- Eigenvalues ---'
+<    do eig=1,numEV
+<      write(*,*) eig,eigValExpand(:,eig)
+<    enddo
+<    write(*,*)
+<    write(*,*)
+<    write(*,*) '--- Eigenvalues Gamma5 ---'
+<    do eig=1,numEV
+<      write(*,*) eig,eigValExpandPRIME(eig)
+<    enddo
+< 
+<  endif
+<  !!!!!!!!!!!!!!!!!
+< 
+< 
+<  ! GMRES Parameters
+<  nGMRES(1) = 60 ! must be smaller than nGMRESeig(1)
+<  nGMRES(2) = 40 ! must be smaller than nGMRESeig(2)
+<  itermin = 10
+<  iflag = -1   ! Wilson
+<  GeeGooinv = 0.0_KR2
+<  resmax = 1e-7_KR2
+<  !inverter = 6 ! use gmresdr/gmresproj
+<  inverter = 0 ! use bicgstab (I am testinmg this because it seems that the inverter didn't converge!).
+<  isignal = 2  ! used to identify gmresproj, 1st rhs is called in eigmodeofM
+<  mvp = 0
+<  gdr = 0.0_KR2
+< 
+<  ! sets rhs for gmresdr in fermprop (2 means use gmres project)
+<  call setrhsnoise(2)
+< 
+<  ! Calculate scalar muliplier term needed in computation
+<  do eig=1,numEV
+<    call oneover(eigValExpand(:,eig),inv_lam(:,eig))
+<  enddo
+<  do eig=1,numEVPRIME
+<    inv_lamPRIME(1,eig) = 1.0_KR2/eigValExpandPRIME(eig)
+<    inv_lamPRIME(2,eig) = 0.0_KR2
+<  enddo
+< 
+<  !!!!       --- Calculate Tr(\tilde{M}) ---      !!!!
+<  ! Since this term does not contribute to the error analysis it will not be implemented 
+<  ! at the moment. For a full calculation the appropriate function calls need to be implemented
+<  ! here. 
+<  Jvev = 0.0_KR2 ! vev is commented out since only error bars are being looked at ******
+< 
+< 
+<  do irhs=1,20 !200
+<    Jtotal = 0.0_KR2
+<    Jave = 0.0_KR2
+< 
+<    ! generate noise vector
+<    call z4source(z2e,z2o,nvhalf,myid)
+<    !call z2source(z2e,z2o,nvhalf)    ! let's try z2 noise
+< 
+<    ! solve for solution vector (gxe,gxo): g5Mx'=z => Mx'=g5z
+<    ! form modified noise vector (gze,gzo) = gamma5*z 
+<    do ieo=1,2
+<      do ibleo=1,8
+<        call gammamult(z2e, z2o, gz2e, gz2o, 5,ieo,ibleo)
+<      enddo
+<    enddo
+< 
+<    if(myid==0) then
+<      write(*,*)'kappa used in fermprop:   ',kappa(1)
+<    endif
+< 
+<    call fermprop(rwdir,gz2e,gz2o,iflag,kappa,0.0_KR2,inverter,coact,bc,resmax,       &
+<                  itermin,0.0_KR2,u,nGMRES(1),nGMRES(2),xeTMP,xoTMP,myid,nn,ldiv,nms, &
+<                  lvbc,lvcl,ib,lbd,iblv,vecbl,vecblinv,0,0,MRT,MRT2)
+<    gxe = xeTMP(:,:,:,:,:,1)
+<    gxo = xoTMP(:,:,:,:,:,1)
+< 
+< 
+<    ! ---- DEBUG CODE ---- !
+<    ! Set to .true. to check residual of each solution explicitly
+<    ! NOTE: This is being done for the gamma5Mx'=z problem
+<    ! NOTE: This is written for the Wilson action only
+<    if (.true.) then
+<      call Hsingle(tmpO,u,gxe,idag,coact,bc,2_KI, &
+<                   vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+< 
+<      call Hsingle(tmpE,u,gxo,idag,coact,bc,1_KI, &
+<                   vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+< 
+<      tmpE(:6,:nvhalf,:4,:2,:8) = gxe(:6,:nvhalf,:4,:2,:8) - kappa(1)*tmpE(:6,:nvhalf,:4,:2,:8)
+<      tmpO(:6,:nvhalf,:4,:2,:8) = gxo(:6,:nvhalf,:4,:2,:8) - kappa(1)*tmpO(:6,:nvhalf,:4,:2,:8)
+< 
+<      tmpE = tmpE - gz2e
+<      tmpO = tmpO - gz2o
+< 
+<      call vecdot(tmpE,tmpE,tmp1,MRT2)
+<      call vecdot(tmpO,tmpO,tmp2,MRT2)
+<      tmp1 = tmp1 + tmp2
+<      call cmpxsqrt(tmp1, tmp2)
+< 
+<      if (myid==0) write(*,*) 'residual of the primed linear system inside testFUNC_abdou: ',tmp2(1)
+<    endif
+< 
+<    ! Eig Subtraction Corrections (all possible eigen combinations/operators)
+<    call generalaverage_abdou(Jave,numEV,numEVPRIME,eigstart,eigstep,u,z2e,z2o,xeTMP(:,:,:,:,:,1),xoTMP(:,:,:,:,:,1), &
+<                        kappa,evectorRevn,evectorRodd,evectorLevn, evectorLodd,inv_lam,                         &
+<                        evectorRevnPRIME, evectorRoddPRIME, inv_lamPRIME,xiinv, xiinvPRIME,                     &
+<                        coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,rwdir,MRT2)
+< 
+<    Jtotal = Jave + Jvev
+<    Jtotal = Jtotal/real(nx*ny*nz,KR2) ! Normalize by volume of latticea
+< 
+<    ! write EACH rhs to file
+<    call vevoutput(Jtotal,numEV,numEVPRIME,eigstart,eigstep,rwdir,myid)
+<  enddo
+< 
+<  call MPI_FINALIZE(ierr)
+<  end subroutine testFUNC_abdou
+< !------------------------------------------------------------------------------------------------------------
+< !--------------------------------------------------------------------------------------------------------------
+<  subroutine eigmodesofMprime(evectorRevnPRIME,evectorRoddPRIME,eigValExpandPRIME,numEVPRIME, &
+<                              u,kappa,coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,          &
+<                              lvcl,ib,lbd,iblv,rwdir,MRT,MRT2,nGMRES)
+<    use shift
+<    real(kind=KR),    intent(out), dimension(:,:,:,:,:,:) :: evectorRevnPRIME, evectorRoddPRIME
+<    real(kind=KR),    intent(out), dimension(:)           :: eigValExpandPRIME
+<    integer(kind=KI), intent(out)                         :: numEVPRIME
+<    real(kind=KR),    intent(inout), dimension(:,:,:,:,:) :: u
+<    real(kind=KR),    intent(in),    dimension(:)         :: kappa
+<    !! --- Identify number of eigenmodes to be calculated --- !!
+<    integer(kind=KI), intent(in),    dimension(:)         :: nGMRES
+<    
+< 
+<    character(len=*), intent(in),    dimension(:)         :: rwdir
+<    integer(kind=KI), intent(in),    dimension(:)         :: bc, nms
+<    integer(kind=KI), intent(in)                          :: myid, MRT,MRT2
+<    real(kind=KR),    intent(in),    dimension(:,:,:)     :: coact
+<    integer(kind=KI), intent(in),    dimension(:,:)       :: vecbl, vecblinv
+<    integer(kind=KI), intent(in),    dimension(:,:)       :: nn, iblv
+<    logical,          intent(in),    dimension(:)         :: ldiv
+<    integer(kind=KI), intent(in),    dimension(:,:,:)     :: lvbc, lvcl
+<    integer(kind=KI), intent(in),    dimension(:,:,:,:)   :: ib
+<    logical,          intent(in),    dimension(:,:)       :: lbd
+< 
+< 
+<    real(kind=KR), dimension(kmaxGMRES)          :: evalueNORM
+<    integer(kind=KI)                             :: irhs,j,ii,nv,gblclr
+<    integer(kind=KI)                             :: idag, ierr
+<    real(kind=KR2),  dimension(2)                :: dottmp1,dottmp2
+<    real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: xe, xo
+<    real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: b,tmpE,bepart
+<    real(kind=KR2),  dimension(6,ntotal,4,2,8)   :: z2e, z2o, tmpO
+<    real(kind=KR2),  dimension(6,ntotal,4,2,8) :: xeTMP,xoTMP
+<    real(kind=KR2),  dimension(6,ntotal,4,2,8,2*kmaxGMRES) :: evectorODD,evectorODDL
+<    real(kind=KR2),  dimension(6,ntotal,4,2,8,2*kmaxGMRES) :: evectorL,evectorR
+<    real(kind=KR2),  dimension(2,kmaxGMRES)      :: evalueTMP
+<    real(kind=KR2),  dimension(2,2*kmaxGMRES)    :: eigValExpand,eigValExpandLEFT
+<    real(kind=KR2),  dimension(2,kmaxGMRES*2)    :: scalarMultiplier
+<    integer,         dimension(kmaxGMRES)        :: ind,ind2
+<    real(kind=KR2),  dimension(2)                :: tmp1, tmp2, tmp3, tmp4
+< 
+<    ! GMRES Variables
+<    integer(kind=KI)                           :: itermin, iflag, inverter
+<    real(kind=KR)                              :: resmax,constt
+<    integer(kind=KI)                           :: itercount, LUcount
+<    real(kind=KR), dimension(18,nvhalf,8,2,16) :: GeeGooinv
+< 
+<    real(kind=KR), dimension(6,ntotal,4,2,8)   :: bopart
+<    integer(kind=KI)                           :: iaa,ibb,icc,eigtest,eig,eigKEEP,eigVecKEEP,id
+<    integer(kind=KI)                           :: ieo,iop,sty,it,styindx,ibleo
+<    integer(kind=KI)                           :: numEV,evStrt,evEnd
+<    real(kind=KR)                              :: tmp,tmpReal,tmpImag
+<    integer(kind=KI)                           :: dim1, dim2,dim3,dim4
+<    integer(kind=KI)                           :: fullruns,styprint
+< 
+<    ! initialize/declare vairable parameters
+<    idag = 0; ! guarentees Mx not Mdagx
+<    itermin = 10
+<    iflag = -1  ! Wilson
+<    GeeGooinv = 0.0_KR2
+< 
+<    ! a throw away right hand side
+<    call z4source(z2e,z2o,nvhalf,myid)
+< 
+<    ! Solve Mx=b
+<    xe(:6,:ntotal,:4,:2,:8) = 0.0_KR2  ! Initial Guess
+<    xo(:6,:ntotal,:4,:2,:8) = 0.0_KR2  ! Initial Guess
+<    call gmresdr5EIG(rwdir,z2e,z2o,xe,xo,nGMRES,resmax,itermin,itercount,u,GeeGooinv, &
+<                  iflag,idag,kappa,coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms, &
+<                  lvbc,ib,lbd,iblv,MRT,MRT2)
+---
+>    ! Solve Mx=b
+>    xe(:6,:ntotal,:4,:2,:8) = 0.0_KR2  ! Initial Guess
+>    xo(:6,:ntotal,:4,:2,:8) = 0.0_KR2  ! Initial Guess
+>    call gmresdr5EIG(rwdir,z2e,z2o,xe,xo,nGMRES,resmax,itermin,itercount,u,GeeGooinv, &
+>                  iflag,idag,kappa,coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms, &
+>                  lvbc,ib,lbd,iblv,MRT,MRT2)
+1631c1208
+<    if (.true.) then
+---
+>    if (.false.) then
+1660c1237
+<      if (myid==0) write(*,*) 'residual of eigenvalues of gamaa5*M: ',tmp2(1)
+---
+>      if (myid==0) write(*,*) 'residual: ',tmp2(1)
+2036,2039d1612
+<  ! This is my version of ns_average. --Abdou
+<  ! changes relative to nsaverage:
+<  !  - replace eigloopops with eigloopops_abdou
+<  !    in which the order of gamma5 multiplication is reversed
+2041,2057d1613
+<  subroutine nsaverage_abdou(Jtime,u,z2e,z2o,xe,xo,kappa,coact,bc,vecbl, &
+<                       vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,      &
+<                       iblv,MRT2,ESHFES)
+<  real(kind=KR),    intent(out),   dimension(:,:,:,:)   :: Jtime
+<  real(kind=KR),    intent(inout), dimension(:,:,:,:,:) :: u
+<  real(kind=KR),    intent(in)                          :: kappa
+<  real(kind=KR),    intent(inout), dimension(:,:,:,:,:) :: z2e, z2o
+<  real(kind=KR),    intent(inout), dimension(:,:,:,:,:) :: xe, xo
+<  real(kind=KR),    intent(in),    dimension(:,:,:)     :: coact
+<  integer(kind=KI), intent(in),    dimension(:)         :: bc, nms
+<  integer(kind=KI), intent(in),    dimension(:,:)       :: vecbl, vecblinv
+<  integer(kind=KI), intent(in),    dimension(:,:)       :: nn, iblv
+<  logical,          intent(in),    dimension(:)         :: ldiv
+<  integer(kind=KI), intent(in),    dimension(:,:,:)     :: lvbc
+<  integer(kind=KI), intent(in),    dimension(:,:,:,:)   :: ib
+<  logical,          intent(in),    dimension(:,:)       :: lbd
+<  integer(kind=KI), intent(in)                          :: myid, MRT2, ESHFES 
+2059,2060d1614
+< ! integer(kind=KI), parameter                         :: nmom=5, nop=5
+<  integer(kind=KI), parameter                         :: nmom=5, nop=9
+2062d1615
+<  integer(kind=KI)                                    :: ieo,ibleo
+2064d1616
+<  real(kind=KR2),   dimension(2,nvhalf,nop)           :: Je, Jo
+2066d1617
+<  real(kind=KR2),   dimension(nvhalf,2,16,nmom-1,nop) :: momfac
+2068,2093d1618
+<  ! initialize data holders
+<  Jtime  = 0.0_KR2
+<  momfac = 0.0_KR2
+< 
+<  ! ---------------- Non-Subtraction ----------------------------!
+<  if (ESHFES == 1) then ! non PRIME method (M no gamma5)
+<    ! apply operators, via time slices
+<    do ibleo = 1,8
+<      do ieo = 1,2
+<        call loopops(0_KI,xe,xo,u,z2e,z2o,Je,Jo,ieo,ibleo,bc,vecbl,   &
+<                     vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT2)
+<        call spacesum(Jtime(:,:,:,:),Je,Jo,ieo,ibleo,momfac,nmom,nop,    &
+<                      myid,vecbl,vecblinv,MRT2)
+<      enddo ! ieo
+<    enddo ! ibleo
+<  else ! PRIME method (M' = gamma5 M)
+<    ! apply operators, via time slices
+<    do ibleo = 1,8
+<      do ieo = 1,2
+<        call eigloopops_abdou(0_KI,xe,xo,u,z2e,z2o,Je,Jo,ieo,ibleo,bc,vecbl,   &
+<                        vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT2)
+<        call spacesum(Jtime(:,:,:,:),Je,Jo,ieo,ibleo,momfac,nmom,nop,    &
+<                      myid,vecbl,vecblinv,MRT2)
+<      enddo ! ieo
+<    enddo ! ibleo
+<  endif                  
+2095,2100d1619
+<  ! kappa normalization for J_mu current
+<  Jtime(:,:,:,1) = kappa*Jtime(:,:,:,1)
+<  Jtime(:,:,:,2) = kappa*Jtime(:,:,:,2)
+<  Jtime(:,:,:,3) = kappa*Jtime(:,:,:,3)
+<  Jtime(:,:,:,4) = kappa*Jtime(:,:,:,4)
+<  end subroutine nsaverage_abdou
+2102d1620
+<  !------------------------------------------------------------------------------   
+2107d1624
+<  ! -----
+2126d1642
+<  ! -------
+2129,2130d1644
+<  !------------------------------------------------------------------------------
+< 
+2153a1668
+> 
+2158c1673,1674
+< !integer(kind=KI), parameter                         ::  nmom=5, nop=5
+---
+> 
+> ! integer(kind=KI), parameter                         ::  nmom=5, nop=5
+2172d1687
+< 
+2234d1748
+< !-------------------------------------------------------------------------------------------------------
+2236,2239d1749
+< !This is my version of eigaverage --Abdou
+< !Changes relative to eigeaverage:
+< ! - use eigloopops_abdou instead of eigloopops (this has the correct order of gamma5 multiplication)
+< !
+2241,2271d1750
+<  subroutine eigaverage_abdou(Jtime,numEV,eigstart,eigstep,u,z2e,z2o,xe,xo,kappa,     &
+<                        evecReven,evecRodd,evecLeven,evecLodd,scalarMultiplier, &
+<                        coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,   &
+<                        iblv,MRT2,ESHFES)
+<  real(kind=KR),    intent(out),   dimension(:,:,:,:,:)    :: Jtime
+<  integer(kind=KI), intent(in)                             :: numEV
+<  integer(kind=KI), intent(in)                             :: eigstart, eigstep
+<  real(kind=KR),    intent(inout), dimension(:,:,:,:,:)    :: u
+<  real(kind=KR),    intent(in)                             :: kappa
+<  real(kind=KR),    intent(inout), dimension(:,:,:,:,:)    :: z2e, z2o
+<  real(kind=KR),    intent(inout), dimension(:,:,:,:,:)    :: xe, xo
+<  real(kind=KR2),   intent(in),    dimension(:,:,:,:,:,:)  :: evecReven, evecRodd
+<  real(kind=KR2),   intent(in),    dimension(:,:,:,:,:,:)  :: evecLeven, evecLodd
+<  real(kind=KR2),   intent(in),    dimension(:,:)          :: scalarMultiplier
+<  real(kind=KR),    intent(in),    dimension(:,:,:)        :: coact
+<  integer(kind=KI), intent(in),    dimension(:)            :: bc, nms
+<  integer(kind=KI), intent(in),    dimension(:,:)          :: vecbl, vecblinv
+<  integer(kind=KI), intent(in),    dimension(:,:)          :: nn, iblv
+<  logical,          intent(in),    dimension(:)            :: ldiv
+<  integer(kind=KI), intent(in),    dimension(:,:,:)        :: lvbc
+<  integer(kind=KI), intent(in),    dimension(:,:,:,:)      :: ib
+<  logical,          intent(in),    dimension(:,:)          :: lbd
+<  integer(kind=KI), intent(in)                             :: myid, MRT2, ESHFES 
+<  real(kind=KR2), dimension(2)              :: tmp1, tmp2
+<  integer(kind=KI)                          :: eig,ieo,ibleo,icri
+<  real(kind=KR2), dimension(6,ntotal,4,2,8) :: xprimeE,xprimeO
+<  real(kind=KR2), dimension(6,ntotal,4,2,8) :: eigcor_q_even,eigcor_q_odd
+< !integer(kind=KI), parameter                         ::  nmom=5, nop=5
+<  integer(kind=KI), parameter                         ::  nmom=5, nop=9
+<  real(kind=KR2),   dimension(2,nvhalf,nop)           :: Je, Jo
+<  real(kind=KR2),   dimension(nvhalf,2,16,nmom-1,nop) :: momfac
+2274,2278d1752
+<  ! initialize data holders
+<  eigcor_q_even = 0.0_KR2
+<  eigcor_q_odd  = 0.0_KR2
+<  Jtime  = 0.0_KR2
+<  momfac = 0.0_KR2
+2280,2281d1753
+<  ! ---------------- Eigen Subtraction -------------------------!
+<  do eig=1,numEV ! only do small modes
+2283,2286d1754
+<    ! tmp2 = L^dag (dot) z2
+<    call vecdot(evecLeven(:,:,:,:,:,eig),z2e,tmp1,MRT2)
+<    call vecdot( evecLodd(:,:,:,:,:,eig),z2o,tmp2,MRT2)
+<    tmp2(:2) = tmp1(:2) + tmp2(:2)
+2288,2289d1755
+<    ! tmp1 = (1/lam) * [L^dag (dot) z2] = scalarMultiplier(:2,eig) * tmp2
+<    call cmpxmult(tmp2,scalarMultiplier(:2,eig),tmp1)
+2291,2306d1756
+<    ! eigcor_q = eigcor_q + (R * 1/lam * [L^dat (dot) z2]) = eigcor_q + (eigcor_q * tmp1)
+<    do icri = 1,5,2
+<      eigcor_q_even(icri  ,:nvhalf,:4,:2,:8) = eigcor_q_even(icri  ,:nvhalf,:4,:2,:8)          &
+<                                             + tmp1(1)*evecReven(icri  ,:nvhalf,:4,:2,:8,eig)  &
+<                                             - tmp1(2)*evecReven(icri+1,:nvhalf,:4,:2,:8,eig)
+<      eigcor_q_even(icri+1,:nvhalf,:4,:2,:8) = eigcor_q_even(icri+1,:nvhalf,:4,:2,:8)          &
+<                                             + tmp1(1)*evecReven(icri+1,:nvhalf,:4,:2,:8,eig)  &
+<                                             + tmp1(2)*evecReven(icri  ,:nvhalf,:4,:2,:8,eig)  
+<   
+<      eigcor_q_odd(icri  ,:nvhalf,:4,:2,:8) = eigcor_q_odd(icri  ,:nvhalf,:4,:2,:8)            &
+<                                            + tmp1(1)*evecRodd(icri  ,:nvhalf,:4,:2,:8,eig)    &
+<                                            - tmp1(2)*evecRodd(icri+1,:nvhalf,:4,:2,:8,eig)  
+<      eigcor_q_odd(icri+1,:nvhalf,:4,:2,:8) = eigcor_q_odd(icri+1,:nvhalf,:4,:2,:8)            &
+<                                            + tmp1(1)*evecRodd(icri+1,:nvhalf,:4,:2,:8,eig)    &
+<                                            + tmp1(2)*evecRodd(icri  ,:nvhalf,:4,:2,:8,eig)
+<    enddo ! icri
+2308,2334d1757
+<    ! only compute result for specific eigmodes
+<    if ( (eig == eigstart) .or. (eig > eigstart .and. 0 == mod(eig-eigstart,eigstep)) .or. (eig == numEV) ) then
+<      xprimeE(:6,:nvhalf,:4,:2,:8) = eigcor_q_even(:6,:nvhalf,:4,:2,:8)
+<      xprimeO(:6,:nvhalf,:4,:2,:8) =  eigcor_q_odd(:6,:nvhalf,:4,:2,:8)
+<      if (ESHFES  == 1) then ! ES
+<        ! apply operators, via time slices
+<        do ibleo = 1,8
+<          do ieo = 1,2
+<            call loopops(0_KI,xprimeE,xprimeO,u,z2e,z2o,Je,Jo,ieo,ibleo,bc,vecbl, &
+<                         vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT2)
+<            call spacesum(Jtime(:,:,eig,:,:),Je,Jo,ieo,ibleo,momfac,nmom,nop,     &
+<                          myid,vecbl,vecblinv,MRT2)
+<          enddo ! ieo
+<        enddo ! ibleo
+<      else ! HFES
+<        ! apply operators, via time slices
+<        do ibleo = 1,8
+<          do ieo = 1,2
+<            call eigloopops_abdou(0_KI,xprimeE,xprimeO,u,z2e,z2o,Je,Jo,ieo,ibleo,bc,vecbl, &
+<                            vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT2)
+<            call spacesum(Jtime(:,:,eig,:,:),Je,Jo,ieo,ibleo,momfac,nmom,nop,        &
+<                          myid,vecbl,vecblinv,MRT2)
+<          enddo ! ieo
+<        enddo ! ibleo
+<      endif
+<    endif ! specific eig modes
+<  enddo ! eig
+2336,2344d1758
+<  ! kappa normalization for J_mu current
+<  do eig=1,numEV
+<    Jtime(:,:,eig,:,1) = kappa*Jtime(:,:,eig,:,1)
+<    Jtime(:,:,eig,:,2) = kappa*Jtime(:,:,eig,:,2)
+<    Jtime(:,:,eig,:,3) = kappa*Jtime(:,:,eig,:,3)
+<    Jtime(:,:,eig,:,4) = kappa*Jtime(:,:,eig,:,4)
+<  enddo
+<  end subroutine eigaverage_abdou
+< !---------------------------------------------------------------------------------------------------
+2454c1868
+<      integer(kind=KI), parameter                         :: nsub=6, nmom=5, nop=9   !I think nop has to be 9 after we add the local vector current -AA
+---
+>      integer(kind=KI), parameter                         :: nsub=6, nmom=5, nop=5   !I think nop has to be 9 after we add the local vector current -AA
+2545,2546c1959,1960
+<            ! inverter=6 is hard coded for gmresdr-proj
+<            call fermprop(rwdir,be,bo,iflag,kapvec,cSW,6_KI,coact,bc,resmax, &
+---
+>            ! inverter=2 is hard coded for gmresdr-proj
+>            call fermprop(rwdir,be,bo,iflag,kapvec,cSW,2_KI,coact,bc,resmax, &
+4239,4249c3653,4182
+<  ! Load the local scalar current into Jvev.
+<  Jvev(1,1,1,5) = ssum(1) + tsum(1)
+<  do it = 2,nt
+<    Jvev(1,it,1,5) = ssum(it) + tsum(it) + tsum(it-1)
+<  enddo ! it
+<  do imom = 1,4
+<    Jvev(1,1,imom+1,5) = mssum(imom,1) + mtsum(imom,1)
+<    do it = 2,nt
+<      Jvev(1,it,imom+1,5) = mssum(imom,it) + mtsum(imom,it) + mtsum(imom,it-1)
+<    enddo ! it
+<  enddo ! imom
+---
+>  ! Load the local scalar current into Jvev.
+>  Jvev(1,1,1,5) = ssum(1) + tsum(1)
+>  do it = 2,nt
+>    Jvev(1,it,1,5) = ssum(it) + tsum(it) + tsum(it-1)
+>  enddo ! it
+>  do imom = 1,4
+>    Jvev(1,1,imom+1,5) = mssum(imom,1) + mtsum(imom,1)
+>    do it = 2,nt
+>      Jvev(1,it,imom+1,5) = mssum(imom,it) + mtsum(imom,it) + mtsum(imom,it-1)
+>    enddo ! it
+>  enddo ! imom
+> 
+>  ! Load the temporal component of the conserved vector current into Jvev.
+>  do imom = 1,4
+>    do it = 1,nt
+>      Jvev(2,it,imom+1,4) = j4sum(imom,it)
+>    enddo ! it
+>  enddo ! imom
+> 
+>  ! Load the spatial components of the conserved vector current into Jvev.
+>  Jvev(2,1,1,1) = j1t(1)
+>  Jvev(2,1,1,2) = j2t(1)
+>  Jvev(2,1,1,3) = j3t(1)
+>  do it = 2,nt
+>    Jvev(2,it,1,1) = j1t(it) - j1t(it-1)
+>    Jvev(2,it,1,2) = j2t(it) - j2t(it-1)
+>    Jvev(2,it,1,3) = j3t(it) - j3t(it-1)
+>  enddo ! it
+>  do imom = 1,4
+>    Jvev(1,1,imom+1,1) = j13s(imom,1) + j13t(imom,1)
+>    Jvev(2,1,imom+1,1) = j21s(imom,1) + j21t(imom,1)
+>    Jvev(1,1,imom+1,2) = j32s(imom,1) + j32t(imom,1)
+>    Jvev(2,1,imom+1,2) = j12s(imom,1) + j12t(imom,1)
+>    Jvev(1,1,imom+1,3) = j23s(imom,1) + j23t(imom,1)
+>    Jvev(2,1,imom+1,3) = j31s(imom,1) + j31t(imom,1)
+>    do it = 2,nt
+>      Jvev(1,it,imom+1,1) = j13s(imom,it) - j13t(imom,it-1) + j13t(imom,it)
+>      Jvev(2,it,imom+1,1) = j21s(imom,it) - j21t(imom,it-1) + j21t(imom,it)
+>      Jvev(1,it,imom+1,2) = j32s(imom,it) - j32t(imom,it-1) + j32t(imom,it)
+>      Jvev(2,it,imom+1,2) = j12s(imom,it) - j12t(imom,it-1) + j12t(imom,it)
+>      Jvev(1,it,imom+1,3) = j23s(imom,it) - j23t(imom,it-1) + j23t(imom,it)
+>      Jvev(2,it,imom+1,3) = j31s(imom,it) - j31t(imom,it-1) + j31t(imom,it)
+>    enddo ! it
+>  enddo ! imom
+> 
+>  ! Tack on an extra minus sign to agree with output of zing.f for example.
+>  Jvev = -Jvev
+> 
+>  ! Sum the results from all processes.
+>  if (nps/=1) then
+>    plaqtemp = plaq
+>    call MPI_REDUCE(plaqtemp,plaq,1,MRT,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+>    call MPI_BCAST(plaq,1,MRT,0,MPI_COMM_WORLD,ierr)
+>    psitemp = psi
+>    call MPI_REDUCE(psitemp,psi,1,MRT,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+>    call MPI_BCAST(psi,1,MRT,0,MPI_COMM_WORLD,ierr)
+>    Jvevtemp = Jvev
+>    nmesg = 2*nt*nmom*nop
+>    call MPI_REDUCE(Jvevtemp(1,1,1,1),Jvev(1,1,1,1),nmesg,MRT,MPI_SUM,0, &
+>                    MPI_COMM_WORLD,ierr)
+>    call MPI_BCAST(Jvev(1,1,1,1),nmesg,MRT,0,MPI_COMM_WORLD,ierr)
+>  endif
+> 
+>  ! Write some secondary results to file.
+>  ! (They are otherwise lost upon completion of this subroutine.)
+>  if (myid==0) then
+>    open(unit=8,file=trim(rwdir(myid+1))//"CFGSPROPS.LOG",     &
+>         action="write",form="formatted",status="old",position="append")
+>    write(unit=8,fmt="(a55,es17.10)") &
+>          "disconloops vev: the average plaquette (mod boundary) =", plaq
+>    write(unit=8,fmt="(a55,es17.10)") &
+>          "disconloops vev: <psibar psi> (mod boundary)          =", psi
+>    close(unit=8,status="keep")
+>  endif
+> 
+>  end subroutine vev
+> 
+> ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+> 
+>  subroutine average(Jtime,nsub,nmom,nop,momfac,u,be,bo,xe,xo,kappa,dobndry, &
+>                     coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd, &
+>                     iblv,rwdir,MRT)
+> ! Purpose of this is simply to calculate averages of operators.
+> ! Due to limitations in subroutine vev, local operators are corrected
+> ! only to 5th order in kappa, and nonlocal ones to 4th order.
+> ! INPUT:
+> !   nsub is the number of results, having different orders of subtraction,
+> !        to be considered (including the case of order=0).
+> !   nmom is the number of momenta to be considered (including momentum=0).
+> !   nop is the number of operators to be considered.
+> !   momfac(isite,ieo,ibl,imom,iop) are the momentum factors
+> !          where the first 3 entries are the lattice site
+> !          and the 4th entry is the momentum
+> !          and the last entry denotes one of the nop operators.
+> !   be() contains the source vector on even (gblclr=1) lattice sites.
+> !   bo() contains the source vector on odd (gblclr=2) lattice sites.
+> !        expected size: be(6,ntotal,4,2,8), bo(6,ntotal,4,2,8)
+> !                       where the first entry is real/imaginary and colour
+> !                       and the 3rd entry is the Dirac index
+> !                       and the other three entries give the lattice site.
+> !   xe() contains the sink vector on even (gblclr=1) lattice sites.
+> !   xo() contains the sink vector on odd (gblclr=2) lattice sites.
+> !        expected size: xe(6,ntotal,4,2,8), xo(6,nvhalf,4,2,8)
+> !                       where the first entry is real/imaginary and colour
+> !                       and the 3rd entry is the Dirac index
+> !                       and the other three entries give the lattice site.
+> ! OUTPUT:
+> !   Jtime(iri,it,isub,imom,iop) are the averaged operators.
+> !        it=1..nt is the time slice on the full (multi-process) lattice.
+> !        isub=1..nsub, where nsub is the number of subtractions
+> !               considered, including "no subtractions".
+> !        imom=1..nmom, where nmom is the number of momenta considered.
+> !        For imom=1, iri=1..2 is the real/imaginary index and iop=1..nop.
+> !        For imom>1, iri=1..2 and iop=1..nop together label Im operators.
+> 
+>     real(kind=KR),    intent(out),   dimension(:,:,:,:,:) :: Jtime
+>     character(len=*), intent(in),    dimension(:)         :: rwdir
+>     real(kind=KR),    intent(in),    dimension(:,:,:,:,:) :: momfac
+>     integer(kind=KI), intent(in)         :: nsub, nmom, nop, dobndry, myid, MRT
+>     real(kind=KR),    intent(in)                         :: kappa
+>     real(kind=KR),    intent(inout), dimension(:,:,:,:,:) :: u
+>     real(kind=KR),    intent(inout), dimension(:,:,:,:,:) :: be, bo
+>     real(kind=KR),    intent(inout), dimension(:,:,:,:,:) :: xe, xo
+>     real(kind=KR),    intent(in),    dimension(:,:,:)     :: coact
+>     integer(kind=KI), intent(in),    dimension(:)         :: bc, nms
+>     integer(kind=KI), intent(in),    dimension(:,:)       :: vecbl, vecblinv
+>     integer(kind=KI), intent(in),    dimension(:,:)       :: nn, iblv
+>     logical,          intent(in),    dimension(:)         :: ldiv
+>     integer(kind=KI), intent(in),    dimension(:,:,:)     :: lvbc
+>     integer(kind=KI), intent(in),    dimension(:,:,:,:)   :: ib
+>     logical,          intent(in),    dimension(:,:)       :: lbd
+> 
+>     integer(kind=KI) :: gblclr, icri, id, isub, ksub, iri, isite, ibl, itbit, &
+>                         ibleo, ieo, idag
+>     real(kind=KR)                               :: xk
+>     real(kind=KR),    dimension(6,ntotal,4,2,8) :: sub1e, sub1o, sub2e, sub2o
+>     real(kind=KR),    dimension(6,nvhalf,4,2,8) :: sube, subo
+>     integer(kind=KI), parameter                 :: itstep=2*nvhalf*npt/nt
+>     real(kind=KR),    dimension(18,itstep,2,8)  :: ubndry
+>     !real(kind=KR),    dimension(2,nvhalf,5)     :: Je, Jo !5 should be replaced by nop
+>     real(kind=KR),    dimension(2,nvhalf,nop)     :: Je, Jo !5 should be replaced by nop
+>     integer(kind=KI) :: ierr, it, iop
+>     integer(kind=KI) :: icolor, idirac, mu, ibl1, gblclr1, jbl, jbleo, jeo
+> 
+>     ! This local gaugelink is used for debugging
+>     real(kind=KR),  dimension(18,ntotal,4,2,16) :: uout
+> 
+>     ! Initialization.
+>     idag = 0
+>     Jtime = 0.0_KR
+> 
+>     ! This routine is used for debugging by setting logical to .true.
+>     !      in if statement below.
+>     if (.false.) then ! debug
+>       call printlog("Debugging average",myid,rwdir)
+>       call printlog("**CHANGE u's BACK**",myid,rwdir)
+>       call fakegauge(uout,myid,rwdir,MRT)
+>       u = uout
+>     endif ! debug
+> 
+>     ! Set temporal links at the maximal timestep (on the global lattice) to zero.
+>     if (.false. .and. dobndry==1) then
+>       itbit = nvhalf - itstep
+>       do ibl = 9,16
+>         iri = ibl - 8
+>         do isite = itbit+1,nvhalf
+>           ubndry(:,isite-itbit,:,iri) = u(:,isite,4,:,ibl)
+>           u(:,isite,4,:,ibl) = 0.0_KR
+>         enddo ! isite
+>       enddo ! ibl
+>     endif
+> 
+>     ! Compute the operators for each level of subtraction.
+>     do isub = 1,nsub
+>       select case(isub)
+>         case(1) ! no subtraction
+>           ksub = 0
+>           sube = 0.0_KR
+>           subo = 0.0_KR
+>         case(2) ! subtraction of O(kappa), O(kappa^2) and O(kappa^3)
+>           ksub = 1
+>           gblclr = 1
+>           call Hsingle(sub1e,u,bo,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           gblclr = 2
+>           call Hsingle(sub1o,u,be,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           do ibleo = 1,8
+>             do ieo = 1,2
+>               do id = 1,4
+>                 do isite = 1,nvhalf
+>                   do icri = 1,6
+>                     sube(icri,isite,id,ieo,ibleo) = be(icri,isite,id,ieo,ibleo) &
+>                                        + kappa*sub1e(icri,isite,id,ieo,ibleo)
+>                     subo(icri,isite,id,ieo,ibleo) = bo(icri,isite,id,ieo,ibleo) &
+>                                        + kappa*sub1o(icri,isite,id,ieo,ibleo)
+>                   enddo ! icri
+>                 enddo ! isite
+>               enddo ! id
+>             enddo ! ieo
+>           enddo ! ibleo
+>           gblclr = 1
+>           call Hsingle(sub2e,u,sub1o,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           gblclr = 2
+>           call Hsingle(sub2o,u,sub1e,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           xk = kappa**2
+>           do ibleo = 1,8
+>             do ieo = 1,2
+>               do id = 1,4
+>                 do isite = 1,nvhalf
+>                   do icri = 1,6
+>                     sube(icri,isite,id,ieo,ibleo) = sube(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub2e(icri,isite,id,ieo,ibleo)
+>                     subo(icri,isite,id,ieo,ibleo) = subo(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub2o(icri,isite,id,ieo,ibleo)
+>                   enddo ! icri
+>                 enddo ! isite
+>               enddo ! id
+>             enddo ! ieo
+>           enddo ! ibleo
+>           gblclr = 1
+>           call Hsingle(sub1e,u,sub2o,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           gblclr = 2
+>           call Hsingle(sub1o,u,sub2e,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           xk = kappa**3
+>           do ibleo = 1,8
+>             do ieo = 1,2
+>               do id = 1,4
+>                 do isite = 1,nvhalf
+>                   do icri = 1,6
+>                     sube(icri,isite,id,ieo,ibleo) = sube(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub1e(icri,isite,id,ieo,ibleo)
+>                     subo(icri,isite,id,ieo,ibleo) = subo(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub1o(icri,isite,id,ieo,ibleo)
+>                   enddo ! icri
+>                 enddo ! isite
+>               enddo ! id
+>             enddo ! ieo
+>           enddo ! ibleo
+>         case(3) ! subtraction of O(kappa^4)
+>           gblclr = 1
+>           call Hsingle(sub2e,u,sub1o,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           gblclr = 2
+>           call Hsingle(sub2o,u,sub1e,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           xk = kappa**4
+>           do ibleo = 1,8
+>             do ieo = 1,2
+>               do id = 1,4
+>                 do isite = 1,nvhalf
+>                   do icri = 1,6
+>                     sube(icri,isite,id,ieo,ibleo) = sube(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub2e(icri,isite,id,ieo,ibleo)
+>                     subo(icri,isite,id,ieo,ibleo) = subo(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub2o(icri,isite,id,ieo,ibleo)
+>                   enddo ! icri
+>                 enddo ! isite
+>               enddo ! id
+>             enddo ! ieo
+>           enddo ! ibleo
+>         case(4) ! subtraction of O(kappa^5)
+>           gblclr = 1
+>           call Hsingle(sub1e,u,sub2o,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           gblclr = 2
+>           call Hsingle(sub1o,u,sub2e,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           xk = kappa**5
+>           do ibleo = 1,8
+>             do ieo = 1,2
+>               do id = 1,4
+>                 do isite = 1,nvhalf
+>                   do icri = 1,6
+>                     sube(icri,isite,id,ieo,ibleo) = sube(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub1e(icri,isite,id,ieo,ibleo)
+>                     subo(icri,isite,id,ieo,ibleo) = subo(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub1o(icri,isite,id,ieo,ibleo)
+>                   enddo ! icri
+>                 enddo ! isite
+>               enddo ! id
+>             enddo ! ieo
+>           enddo ! ibleo
+>         case(5) ! subtraction of O(kappa^6)
+>           gblclr = 1
+>           call Hsingle(sub1e,u,sub2o,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           gblclr = 2
+>           call Hsingle(sub1o,u,sub2e,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           xk = kappa**6
+>           do ibleo = 1,8
+>             do ieo = 1,2
+>               do id = 1,4
+>                 do isite = 1,nvhalf
+>                   do icri = 1,6
+>                     sube(icri,isite,id,ieo,ibleo) = sube(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub1e(icri,isite,id,ieo,ibleo)
+>                     subo(icri,isite,id,ieo,ibleo) = subo(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub1o(icri,isite,id,ieo,ibleo)
+>                   enddo ! icri
+>                 enddo ! isite
+>               enddo ! id
+>             enddo ! ieo
+>           enddo ! ibleo
+>         case(6) ! subtraction of O(kappa^7)
+>           gblclr = 1
+>           call Hsingle(sub1e,u,sub2o,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           gblclr = 2
+>           call Hsingle(sub1o,u,sub2e,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           xk = kappa**6
+>           do ibleo = 1,8
+>             do ieo = 1,2
+>               do id = 1,4
+>                 do isite = 1,nvhalf
+>                   do icri = 1,6
+>                     sube(icri,isite,id,ieo,ibleo) = sube(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub1e(icri,isite,id,ieo,ibleo)
+>                     subo(icri,isite,id,ieo,ibleo) = subo(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub1o(icri,isite,id,ieo,ibleo)
+>                   enddo ! icri
+>                 enddo ! isite
+>               enddo ! id
+>             enddo ! ieo
+>           enddo ! ibleo
+>         case default
+>           open(unit=8,file="DISCONLOOPS.ERROR",action="write",status="replace", &
+>                form="formatted")
+>           write(unit=8,fmt=*) "subroutine average: isub =", isub
+>           close(unit=8,status="keep")
+>           stop
+>       end select
+>       if (isub==2) then
+>         do ibleo = 1,8
+>           do ieo = 1,2
+>             do id = 1,4
+>               do isite = 1,nvhalf
+>                 do icri = 1,6
+>                   sub2e(icri,isite,id,ieo,ibleo) = xe(icri,isite,id,ieo,ibleo) &
+>                                                - sube(icri,isite,id,ieo,ibleo)
+>                   sub2o(icri,isite,id,ieo,ibleo) = xo(icri,isite,id,ieo,ibleo) &
+>                                                - subo(icri,isite,id,ieo,ibleo)
+>                 enddo ! icri
+>               enddo ! isite
+>             enddo ! id
+>           enddo ! ieo
+>         enddo ! ibleo
+>         do ibleo = 1,8
+>           do ieo = 1,2
+>             call loopops(ksub,sub2e,sub2o,u,be,bo,Je,Jo,ieo,ibleo,bc,vecbl, &
+>                          vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>             call spacesum(Jtime(:,:,isub,:,:),Je,Jo,ieo,ibleo,momfac,nmom,nop, &
+>                           myid,vecbl,vecblinv,MRT)
+>           enddo ! ieo
+>         enddo ! ibleo
+>       else
+>         do ibleo = 1,8
+>           do ieo = 1,2
+>             do id = 1,4
+>               do isite = 1,nvhalf
+>                 do icri = 1,6
+>                   sub1e(icri,isite,id,ieo,ibleo) = xe(icri,isite,id,ieo,ibleo) &
+>                                                - sube(icri,isite,id,ieo,ibleo)
+>                   sub1o(icri,isite,id,ieo,ibleo) = xo(icri,isite,id,ieo,ibleo) &
+>                                                - subo(icri,isite,id,ieo,ibleo)
+>                 enddo ! icri
+>               enddo ! isite
+>             enddo ! id
+>           enddo ! ieo
+>         enddo ! ibleo
+>         do ibleo = 1,8
+>           do ieo = 1,2
+>             call loopops(ksub,sub1e,sub1o,u,be,bo,Je,Jo,ieo,ibleo,bc,vecbl, &
+>                          vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>             call spacesum(Jtime(:,:,isub,:,:),Je,Jo,ieo,ibleo,momfac,nmom,nop, &
+>                           myid,vecbl,vecblinv,MRT)
+>           enddo ! ieo
+>         enddo ! ibleo
+>       endif
+>     enddo ! isub
+> 
+>     ! Return temporal links at the maximal timestep to their true nonzero values.
+>     if (.false. .and. dobndry==1) then
+>       do ibl = 9,16
+>         iri = ibl - 8
+>         do isite = itbit+1,nvhalf
+>           u(:,isite,4,:,ibl) = ubndry(:,isite-itbit,:,iri)
+>         enddo ! isite
+>       enddo ! ibl
+>     endif
+>     
+>     ! A final normalization factor.
+>     Jtime(:,:,:,:,1) = kappa*Jtime(:,:,:,:,1)
+>     Jtime(:,:,:,:,2) = kappa*Jtime(:,:,:,:,2)
+>     Jtime(:,:,:,:,3) = kappa*Jtime(:,:,:,:,3)
+>     Jtime(:,:,:,:,4) = kappa*Jtime(:,:,:,:,4)
+>     end subroutine average
+> !------------------------------------------------------------------------------ 
+>  subroutine ppaverage(Jtime,nsub,nmom,nop,momfac,u,be,bo,xe,xo,kappa,dobndry, &
+>                     coact,bc,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd, &
+>                     iblv,rwdir,MRT,MRT2)
+> ! Purpose of this is simply to calculate averages of operators.
+> ! Due to limitations in subroutine vev, local operators are corrected
+> ! only to 5th order in kappa, and nonlocal ones to 4th order.
+> ! INPUT:
+> !   nsub is the number of results, having different orders of subtraction,
+> !        to be considered (including the case of order=0).
+> !   nmom is the number of momenta to be considered (including momentum=0).
+> !   nop is the number of operators to be considered.
+> !   momfac(isite,ieo,ibl,imom,iop) are the momentum factors
+> !          where the first 3 entries are the lattice site
+> !          and the 4th entry is the momentum
+> !          and the last entry denotes one of the nop operators.
+> !   be() contains the source vector on even (gblclr=1) lattice sites.
+> !   bo() contains the source vector on odd (gblclr=2) lattice sites.
+> !        expected size: be(6,ntotal,4,2,8), bo(6,ntotal,4,2,8)
+> !                       where the first entry is real/imaginary and colour
+> !                       and the 3rd entry is the Dirac index
+> !                       and the other three entries give the lattice site.
+> !   xe() contains the sink vector on even (gblclr=1) lattice sites.
+> !   xo() contains the sink vector on odd (gblclr=2) lattice sites.
+> !        expected size: xe(6,ntotal,4,2,8), xo(6,nvhalf,4,2,8)
+> !                       where the first entry is real/imaginary and colour
+> !                       and the 3rd entry is the Dirac index
+> !                       and the other three entries give the lattice site.
+> ! OUTPUT:
+> !   Jtime(iri,it,isub,imom,iop) are the averaged operators.
+> !        it=1..nt is the time slice on the full (multi-process) lattice.
+> !        isub=1..nsub, where nsub is the number of subtractions
+> !               considered, including "no subtractions".
+> !        imom=1..nmom, where nmom is the number of momenta considered.
+> !        For imom=1, iri=1..2 is the real/imaginary index and iop=1..nop.
+> !        For imom>1, iri=1..2 and iop=1..nop together label Im operators.
+> 
+>     real(kind=KR),    intent(out),   dimension(:,:,:,:,:) :: Jtime
+>     character(len=*), intent(in),    dimension(:)         :: rwdir
+>     real(kind=KR),    intent(in),    dimension(:,:,:,:,:) :: momfac
+>     integer(kind=KI), intent(in)    :: nsub, nmom, nop, dobndry, myid, MRT, MRT2
+>     real(kind=KR),    intent(in),    dimension(:)         :: kappa
+>     real(kind=KR),    intent(inout), dimension(:,:,:,:,:) :: u
+>     real(kind=KR),    intent(inout), dimension(:,:,:,:,:) :: be, bo
+>     real(kind=KR),    intent(inout), dimension(:,:,:,:,:) :: xe, xo
+>     real(kind=KR),    intent(in),    dimension(:,:,:)     :: coact
+>     integer(kind=KI), intent(in),    dimension(:)         :: bc, nms
+>     integer(kind=KI), intent(in),    dimension(:,:)       :: vecbl, vecblinv
+>     integer(kind=KI), intent(in),    dimension(:,:)       :: nn, iblv
+>     logical,          intent(in),    dimension(:)         :: ldiv
+>     integer(kind=KI), intent(in),    dimension(:,:,:)     :: lvbc
+>     integer(kind=KI), intent(in),    dimension(:,:,:,:)   :: ib
+>     logical,          intent(in),    dimension(:,:)       :: lbd
+> 
+>     integer(kind=KI) :: gblclr, icri, id, isub, ksub, iri, isite, ibl, itbit, &
+>                         ibleo, ieo, idag, i, j, p, iflag
+>     real(kind=KR)                               :: xk, fac1, fac2
+>     real(kind=KR),    dimension(6,ntotal,4,2,8) :: sub1e, sub1o, sub2e, sub2o,&
+>                                                    vecsrc,temp
+>     real(kind=KR),    dimension(6,nvhalf,4,2,8) :: sube, subo, GeeGooinv
+>     integer(kind=KI), parameter                 :: itstep=2*nvhalf*npt/nt
+>     real(kind=KR),    dimension(18,itstep,2,8)  :: ubndry
+>     !real(kind=KR),    dimension(2,nvhalf,5)     :: Je, Jo !5 should be replaced by nop
+>     real(kind=KR),    dimension(2,nvhalf,nop)     :: Je, Jo !5 should be replaced by nop
+>     integer(kind=KI) :: ierr, it, iop
+>     integer(kind=KI) :: icolor, idirac, mu, ibl1, gblclr1, jbl, jbleo, jeo
+>     real(kind=KR2),   dimension(2)                          :: beta
+>     ! This local gaugelink is used for debugging
+>     real(kind=KR),  dimension(18,ntotal,4,2,16) :: uout
+> 
+>     ! Initialization.
+>     p = 6
+>     idag = 0
+>     Jtime = 0.0_KR
+>     GeeGooinv = 0.0_KR
+>     iflag = -1
+>     ! This routine is used for debugging by setting logical to .true.
+>     !      in if statement below.
+>     if (.false.) then ! debug
+>       call printlog("Debugging average",myid,rwdir)
+>       call printlog("**CHANGE u's BACK**",myid,rwdir)
+>       call fakegauge(uout,myid,rwdir,MRT)
+>       u = uout
+>     endif ! debug
+> 
+>     ! Set temporal links at the maximal timestep (on the global lattice) to zero.
+>     if (.false. .and. dobndry==1) then
+>       itbit = nvhalf - itstep
+>       do ibl = 9,16
+>         iri = ibl - 8
+>         do isite = itbit+1,nvhalf
+>           ubndry(:,isite-itbit,:,iri) = u(:,isite,4,:,ibl)
+>           u(:,isite,4,:,ibl) = 0.0_KR
+>         enddo ! isite
+>       enddo ! ibl
+>     endif
+> !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+> !define the right hand side for xe
+>       gblclr = 1
+>       idag = 0
+>       call Hsingle(temp,u,bo,idag,coact,bc,gblclr,vecbl, &
+>                    vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+> 
+>       fac1 = 1.0_KR/kappa(1)**2
+>       fac2 = 1.0_KR/kappa(1)
+>       do isite = 1,nvhalf
+>        vecsrc(:,isite,:,:,:) = fac1*be(:,isite,:,:,:) + fac2*temp(:,isite,:,:,:)
+>       enddo ! isite
+> !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+> !Determine the polynomial.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+>     do isite = 1,nvhalf
+>      vprime(:,isite,:,:,:,1) = vecsrc(:,isite,:,:,:)
+>     enddo !k
+>     do i = 1,p
+>      call Hdbletm(vprime(:,:,:,:,:,i+1),u,GeeGooinv,vprime(:,:,:,:,:,i),idag, &
+>                  coact,kappa,iflag,bc,vecbl,vecblinv,myid,nn, &
+>                  ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>     enddo !i
+>     
+>     do i=2,p+1
+>      do j=2,p+1
+>       call vecdot(vprime(:,:,:,:,:,i),vprime(:,:,:,:,:,j),beta,MRT2)
+>       lsmat(:,i-1,j-1) = beta(:)  !lsmat(2,p,p) ,cls(2,p,1)
+> !      print *, "i,j, lsmat(:,i,j)=", i-1,j-1, lsmat(:,i-1,j-1)
+>      enddo!j
+>     enddo!i
+>         
+4251,4256d4183
+<  ! Load the temporal component of the conserved vector current into Jvev.
+<  do imom = 1,4
+<    do it = 1,nt
+<      Jvev(2,it,imom+1,4) = j4sum(imom,it)
+<    enddo ! it
+<  enddo ! imom
+4258,4282d4184
+<  ! Load the spatial components of the conserved vector current into Jvev.
+<  Jvev(2,1,1,1) = j1t(1)
+<  Jvev(2,1,1,2) = j2t(1)
+<  Jvev(2,1,1,3) = j3t(1)
+<  do it = 2,nt
+<    Jvev(2,it,1,1) = j1t(it) - j1t(it-1)
+<    Jvev(2,it,1,2) = j2t(it) - j2t(it-1)
+<    Jvev(2,it,1,3) = j3t(it) - j3t(it-1)
+<  enddo ! it
+<  do imom = 1,4
+<    Jvev(1,1,imom+1,1) = j13s(imom,1) + j13t(imom,1)
+<    Jvev(2,1,imom+1,1) = j21s(imom,1) + j21t(imom,1)
+<    Jvev(1,1,imom+1,2) = j32s(imom,1) + j32t(imom,1)
+<    Jvev(2,1,imom+1,2) = j12s(imom,1) + j12t(imom,1)
+<    Jvev(1,1,imom+1,3) = j23s(imom,1) + j23t(imom,1)
+<    Jvev(2,1,imom+1,3) = j31s(imom,1) + j31t(imom,1)
+<    do it = 2,nt
+<      Jvev(1,it,imom+1,1) = j13s(imom,it) - j13t(imom,it-1) + j13t(imom,it)
+<      Jvev(2,it,imom+1,1) = j21s(imom,it) - j21t(imom,it-1) + j21t(imom,it)
+<      Jvev(1,it,imom+1,2) = j32s(imom,it) - j32t(imom,it-1) + j32t(imom,it)
+<      Jvev(2,it,imom+1,2) = j12s(imom,it) - j12t(imom,it-1) + j12t(imom,it)
+<      Jvev(1,it,imom+1,3) = j23s(imom,it) - j23t(imom,it-1) + j23t(imom,it)
+<      Jvev(2,it,imom+1,3) = j31s(imom,it) - j31t(imom,it-1) + j31t(imom,it)
+<    enddo ! it
+<  enddo ! imom
+4284,4285c4186,4201
+<  ! Tack on an extra minus sign to agree with output of zing.f for example.
+<  Jvev = -Jvev
+---
+>    do i=2,p+1
+>      call vecdot(vprime(:,:,:,:,:,i),vecsrc(:,:,:,:,:),beta,MRT2)
+>      cls(:,i-1,1) = beta(:)
+> !     print *, "i,cls(:,i)=", i-1, cls(:,i-1,1)
+>    enddo!i
+>     
+>     call linearsolver(p,1,lsmat,ipiv2,cls)
+>     co(:,:) = cls(:,:,1)    
+> !    co = 0.0_KR2    
+> !    co(1,1) = 4
+>    if(myid==0) then
+>     do i=1,p
+>      print *, "i,result(:,i)=", i, co(:,i)
+>     enddo!i  
+>    endif!myid
+> !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+4287,4300d4202
+<  ! Sum the results from all processes.
+<  if (nps/=1) then
+<    plaqtemp = plaq
+<    call MPI_REDUCE(plaqtemp,plaq,1,MRT,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+<    call MPI_BCAST(plaq,1,MRT,0,MPI_COMM_WORLD,ierr)
+<    psitemp = psi
+<    call MPI_REDUCE(psitemp,psi,1,MRT,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+<    call MPI_BCAST(psi,1,MRT,0,MPI_COMM_WORLD,ierr)
+<    Jvevtemp = Jvev
+<    nmesg = 2*nt*nmom*nop
+<    call MPI_REDUCE(Jvevtemp(1,1,1,1),Jvev(1,1,1,1),nmesg,MRT,MPI_SUM,0, &
+<                    MPI_COMM_WORLD,ierr)
+<    call MPI_BCAST(Jvev(1,1,1,1),nmesg,MRT,0,MPI_COMM_WORLD,ierr)
+<  endif
+4302,4312c4204,4205
+<  ! Write some secondary results to file.
+<  ! (They are otherwise lost upon completion of this subroutine.)
+<  if (myid==0) then
+<    open(unit=8,file=trim(rwdir(myid+1))//"CFGSPROPS.LOG",     &
+<         action="write",form="formatted",status="old",position="append")
+<    write(unit=8,fmt="(a55,es17.10)") &
+<          "disconloops vev: the average plaquette (mod boundary) =", plaq
+<    write(unit=8,fmt="(a55,es17.10)") &
+<          "disconloops vev: <psibar psi> (mod boundary)          =", psi
+<    close(unit=8,status="keep")
+<  endif
+---
+>     ! Compute the operators for each level of subtraction.Andy is here.In the pp
+>     ! average,we use P(M) as the M^(-1)_pert.The P(M) is generated when we do th    ! ppgmresdr invertion.
+4314c4207,4433
+<  end subroutine vev
+---
+>     do isub = 1,nsub
+>       select case(isub)
+>         case(1) ! no subtraction
+>           ksub = 0
+>           sube = 0.0_KR
+>           subo = 0.0_KR
+>         case(2) ! subtraction of O(kappa), O(kappa^2) and O(kappa^3)
+>           ksub = 1
+>           do icri=1,5,2
+>            do isite=1,nvhalf
+>             sube(icri,isite,:,:,:) = co(1,1)*vecsrc(icri,isite,:,:,:) &
+>                                       -co(2,1)*vecsrc(icri+1,isite,:,:,:)
+>             sube(icri+1,isite,:,:,:) = co(1,1)*vecsrc(icri+1,isite,:,:,:) &
+>                                         +co(2,1)*vecsrc(icri,isite,:,:,:)
+>            enddo!isite
+>           enddo!icri
+>           call Hdbletm(sub1e,u,GeeGooinv,vecsrc,idag,coact,kappa,iflag,bc, &
+>                     vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>         do icri=1,5,2
+>          do isite=1,nvhalf
+>           sube(icri  ,isite,:,:,:) = sube(icri ,isite,:,:,:) &
+>                                      +co(1,2)*sub1e(icri,isite,:,:,:) &
+>                                      -co(2,2)*sub1e(icri+1,isite,:,:,:)
+>           sube(icri+1,isite,:,:,:) = sube(icri+1,isite,:,:,:) &
+>                                      +co(1,2)*sub1e(icri+1,isite,:,:,:) &
+>                                      +co(2,2)*sub1e(icri,isite,:,:,:)
+>          enddo!isite
+>         enddo!icri             
+> 
+> !         subo = bo + kappa*H_oe*sube
+>         gblclr = 2
+>         idag = 0
+>         call Hsingle(subo,u,sube,idag,coact,bc, &
+>                    gblclr,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           do isite = 1,nvhalf
+>            subo(:,isite,:,:,:) = bo(:,isite,:,:,:) &
+>                                + kappa(1)*subo(:,isite,:,:,:)
+>           enddo ! isite
+> 
+> 
+> 
+> !!!!!!!!!!!!!!!!!!!!!!!!!!!!order1!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+>         call Hdbletm(sub2e,u,GeeGooinv,sub1e,idag,coact,kappa,iflag,bc, &
+>                    vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>         do icri=1,5,2
+>          do isite=1,nvhalf
+>           sube(icri  ,isite,:,:,:) = sube(icri ,isite,:,:,:) &
+>                                      +co(1,3)*sub2e(icri,isite,:,:,:) &
+>                                      -co(2,3)*sub2e(icri+1,isite,:,:,:)
+>           sube(icri+1,isite,:,:,:) = sube(icri+1,isite,:,:,:) &
+>                                      +co(1,3)*sub2e(icri+1,isite,:,:,:) &
+>                                      +co(2,3)*sub2e(icri,isite,:,:,:)
+>          enddo!isite
+>         enddo!icri             
+>         gblclr = 2
+>         idag = 0
+>         call Hsingle(subo,u,sube,idag,coact,bc, &
+>                    gblclr,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           do isite = 1,nvhalf
+>            subo(:,isite,:,:,:) = bo(:,isite,:,:,:) &
+>                                + kappa(1)*subo(:,isite,:,:,:)
+>           enddo ! isite
+> !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!order2!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+>          call Hdbletm(sub1e,u,GeeGooinv,sub2e,idag,coact,kappa,iflag,bc, &
+>                    vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>         do icri=1,5,2
+>          do isite=1,nvhalf
+>           sube(icri  ,isite,:,:,:) = sube(icri ,isite,:,:,:) &
+>                                      +co(1,4)*sub1e(icri,isite,:,:,:) &
+>                                      -co(2,4)*sub1e(icri+1,isite,:,:,:)
+>           sube(icri+1,isite,:,:,:) = sube(icri+1,isite,:,:,:) &
+>                                      +co(1,4)*sub1e(icri+1,isite,:,:,:) &
+>                                      +co(2,4)*sub1e(icri,isite,:,:,:)
+>          enddo!isite
+>         enddo!icri             
+>         gblclr = 2
+>         idag = 0
+>         call Hsingle(subo,u,sube,idag,coact,bc, &
+>                    gblclr,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           do isite = 1,nvhalf
+>            subo(:,isite,:,:,:) = bo(:,isite,:,:,:) &
+>                                + kappa(1)*subo(:,isite,:,:,:)
+>           enddo ! isite
+> !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!order3!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                                
+>         case(3) ! 
+>          call Hdbletm(sub2e,u,GeeGooinv,sub1e,idag,coact,kappa,iflag,bc, &
+>                    vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>         do icri=1,5,2
+>          do isite=1,nvhalf
+>           sube(icri  ,isite,:,:,:) = sube(icri ,isite,:,:,:) &
+>                                      +co(1,5)*sub2e(icri,isite,:,:,:) &
+>                                      -co(2,5)*sub2e(icri+1,isite,:,:,:)
+>           sube(icri+1,isite,:,:,:) = sube(icri+1,isite,:,:,:) &
+>                                      +co(1,5)*sub2e(icri+1,isite,:,:,:) &
+>                                      +co(2,5)*sub2e(icri,isite,:,:,:)
+>          enddo!isite
+>         enddo!icri             
+>         gblclr = 2
+>         idag = 0
+>         call Hsingle(subo,u,sube,idag,coact,bc, &
+>                    gblclr,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           do isite = 1,nvhalf
+>            subo(:,isite,:,:,:) = bo(:,isite,:,:,:) &
+>                                + kappa(1)*subo(:,isite,:,:,:)
+>           enddo ! isite
+> !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!order4!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+>         case(4) 
+>          call Hdbletm(sub1e,u,GeeGooinv,sub2e,idag,coact,kappa,iflag,bc, &
+>                    vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>         do icri=1,5,2
+>          do isite=1,nvhalf
+>           sube(icri  ,isite,:,:,:) = sube(icri ,isite,:,:,:) &
+>                                      +co(1,6)*sub1e(icri,isite,:,:,:) &
+>                                      -co(2,6)*sub1e(icri+1,isite,:,:,:)
+>           sube(icri+1,isite,:,:,:) = sube(icri+1,isite,:,:,:) &
+>                                      +co(1,6)*sub1e(icri+1,isite,:,:,:) &
+>                                      +co(2,6)*sub1e(icri,isite,:,:,:)
+>          enddo!isite
+>         enddo!icri             
+>         gblclr = 2
+>         idag = 0
+>         call Hsingle(subo,u,sube,idag,coact,bc, &
+>                    gblclr,vecbl,vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           do isite = 1,nvhalf
+>            subo(:,isite,:,:,:) = bo(:,isite,:,:,:) &
+>                                + kappa(1)*subo(:,isite,:,:,:)
+>           enddo ! isite
+> !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!order5!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+>         case(5) ! subtraction of O(kappa^6)!Andy is here.I think the codes doesn't work for order 6 and 7.
+>           gblclr = 1
+>           call Hsingle(sub1e,u,sub2o,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           gblclr = 2
+>           call Hsingle(sub1o,u,sub2e,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           xk = kappa(1)**6
+>           do ibleo = 1,8
+>             do ieo = 1,2
+>               do id = 1,4
+>                 do isite = 1,nvhalf
+>                   do icri = 1,6
+>                     sube(icri,isite,id,ieo,ibleo) = sube(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub1e(icri,isite,id,ieo,ibleo)
+>                     subo(icri,isite,id,ieo,ibleo) = subo(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub1o(icri,isite,id,ieo,ibleo)
+>                   enddo ! icri
+>                 enddo ! isite
+>               enddo ! id
+>             enddo ! ieo
+>           enddo ! ibleo
+>         case(6) ! subtraction of O(kappa^7)
+>           gblclr = 1
+>           call Hsingle(sub1e,u,sub2o,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           gblclr = 2
+>           call Hsingle(sub1o,u,sub2e,idag,coact,bc,gblclr,vecbl,vecblinv,myid, &
+>                        nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>           xk = kappa(1)**6
+>           do ibleo = 1,8
+>             do ieo = 1,2
+>               do id = 1,4
+>                 do isite = 1,nvhalf
+>                   do icri = 1,6
+>                     sube(icri,isite,id,ieo,ibleo) = sube(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub1e(icri,isite,id,ieo,ibleo)
+>                     subo(icri,isite,id,ieo,ibleo) = subo(icri,isite,id,ieo,ibleo) &
+>                                               + xk*sub1o(icri,isite,id,ieo,ibleo)
+>                   enddo ! icri
+>                 enddo ! isite
+>               enddo ! id
+>             enddo ! ieo
+>           enddo ! ibleo
+>         case default
+>           open(unit=8,file="DISCONLOOPS.ERROR",action="write",status="replace", &
+>                form="formatted")
+>           write(unit=8,fmt=*) "subroutine average: isub =", isub
+>           close(unit=8,status="keep")
+>           stop
+>       end select
+>       if (isub==2) then
+>         do ibleo = 1,8
+>           do ieo = 1,2
+>             do id = 1,4
+>               do isite = 1,nvhalf
+>                 do icri = 1,6
+>                   sub2e(icri,isite,id,ieo,ibleo) = xe(icri,isite,id,ieo,ibleo) &
+>                                                - sube(icri,isite,id,ieo,ibleo)
+>                   sub2o(icri,isite,id,ieo,ibleo) = xo(icri,isite,id,ieo,ibleo) &
+>                                                - subo(icri,isite,id,ieo,ibleo)
+>                 enddo ! icri
+>               enddo ! isite
+>             enddo ! id
+>           enddo ! ieo
+>         enddo ! ibleo
+>         do ibleo = 1,8
+>           do ieo = 1,2
+>             call loopops(ksub,sub2e,sub2o,u,be,bo,Je,Jo,ieo,ibleo,bc,vecbl, &
+>                          vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>             call spacesum(Jtime(:,:,isub,:,:),Je,Jo,ieo,ibleo,momfac,nmom,nop, &
+>                           myid,vecbl,vecblinv,MRT)
+>           enddo ! ieo
+>         enddo ! ibleo
+>       else
+>         do ibleo = 1,8
+>           do ieo = 1,2
+>             do id = 1,4
+>               do isite = 1,nvhalf
+>                 do icri = 1,6
+>                   sub1e(icri,isite,id,ieo,ibleo) = xe(icri,isite,id,ieo,ibleo) &
+>                                                - sube(icri,isite,id,ieo,ibleo)
+>                   sub1o(icri,isite,id,ieo,ibleo) = xo(icri,isite,id,ieo,ibleo) &
+>                                                - subo(icri,isite,id,ieo,ibleo)
+>                 enddo ! icri
+>               enddo ! isite
+>             enddo ! id
+>           enddo ! ieo
+>         enddo ! ibleo
+>         do ibleo = 1,8
+>           do ieo = 1,2
+>             call loopops(ksub,sub1e,sub1o,u,be,bo,Je,Jo,ieo,ibleo,bc,vecbl, &
+>                          vecblinv,myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>             call spacesum(Jtime(:,:,isub,:,:),Je,Jo,ieo,ibleo,momfac,nmom,nop, &
+>                           myid,vecbl,vecblinv,MRT)
+>           enddo ! ieo
+>         enddo ! ibleo
+>       endif
+>     enddo ! isub
+4315a4435,4450
+>     ! Return temporal links at the maximal timestep to their true nonzero values.
+>     if (.false. .and. dobndry==1) then
+>       do ibl = 9,16
+>         iri = ibl - 8
+>         do isite = itbit+1,nvhalf
+>           u(:,isite,4,:,ibl) = ubndry(:,isite-itbit,:,iri)
+>         enddo ! isite
+>       enddo ! ibl
+>     endif
+>     
+>     ! A final normalization factor.
+>     Jtime(:,:,:,:,1) = kappa(1)*Jtime(:,:,:,:,1)
+>     Jtime(:,:,:,:,2) = kappa(1)*Jtime(:,:,:,:,2)
+>     Jtime(:,:,:,:,3) = kappa(1)*Jtime(:,:,:,:,3)
+>     Jtime(:,:,:,:,4) = kappa(1)*Jtime(:,:,:,:,4)
+>     end subroutine ppaverage
+4317,4318c4452
+< 
+<  subroutine average(Jtime,nsub,nmom,nop,momfac,u,be,bo,xe,xo,kappa,dobndry, &
+---
+>  subroutine averagePRIME(Jtime,nsub,nmom,nop,momfac,u,be,bo,xe,xo,kappa,dobndry, &
+4320a4455,4460
+> 
+> ! This subroutine performs the perturbative subtraction similar to the subroutine
+> ! average. However, it uses eigloopops instead of loopops because testFUNC subroutine
+> ! gives only the solution of M*x'=gamma5*z. 
+> ! -AA 11/26/2012 
+> 
+4594c4734
+<             call loopops(ksub,sub2e,sub2o,u,be,bo,Je,Jo,ieo,ibleo,bc,vecbl, &
+---
+>             call eigloopops(ksub,sub2e,sub2o,u,be,bo,Je,Jo,ieo,ibleo,bc,vecbl, &
+4617c4757
+<             call loopops(ksub,sub1e,sub1o,u,be,bo,Je,Jo,ieo,ibleo,bc,vecbl, &
+---
+>             call eigloopops(ksub,sub1e,sub1o,u,be,bo,Je,Jo,ieo,ibleo,bc,vecbl, &
+4641,4643c4781,4783
+<     end subroutine average
+<  
+< ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+---
+>     end subroutine averagePRIME
+> 
+> ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+4789c4929
+< ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+---
+> 
+4793c4933,4934
+<  subroutine eigloopops(ksub,xe,xo,u,be,bo,Je,Jo,ieo,ibleo,bc,vecbl,vecblinv, &
+---
+> ! NOTE: source vector is "b" and noise vector is "x"
+>  subroutine eigloopops_original(ksub,xe,xo,u,be,bo,Je,Jo,ieo,ibleo,bc,vecbl,vecblinv, &
+4815c4956
+< !        expected size: Je(2,nvhalf,9), Jo(2,nvhalf,9)
+---
+> !        expected size: Je(2,nvhalf,5), Jo(2,nvhalf,5)
+4834c4975
+<     real(kind=KR), dimension(6,ntotal,4,2,8) :: temp
+---
+>     real(kind=KR), dimension(6,nvhalf,4) :: temp
+4836,4838c4977
+<     integer(kind=KI) :: id, isite, ibl;
+< 
+< 
+---
+>     integer(kind=KI) :: id, isite, ibl
+4852,4853c4991,4992
+<      call mulfor2(temp(:,:,:,ieo,ibleo),u,be,mu,gblclr,ieo,ibleo,vecbl)
+<      call gammamultshort(temp(:,:,:,ieo,ibleo), gtemp, 5) ! multiply by gamma5
+---
+>      call mulfor2(temp,u,be,mu,gblclr,ieo,ibleo,vecbl)
+>      call gammamultshort(temp, gtemp, 5) ! multiply by gamma5
+4862,4863c5001,5002
+<      call mulfor2(temp(:,:,:,ieo,ibleo),u,bo,mu,gblclr,ieo,ibleo,vecbl)
+<      call gammamultshort(temp(:,:,:,ieo,ibleo), gtemp, 5) ! multiply by gamma5
+---
+>      call mulfor2(temp,u,bo,mu,gblclr,ieo,ibleo,vecbl)
+>      call gammamultshort(temp, gtemp, 5) ! multiply by gamma5
+4872c5011
+<      call mulbac2(temp(:,:,:,ieo,ibleo),u,bo,mu,bc,gblclr,ieo,ibleo,vecbl,vecblinv,myid,nn, &
+---
+>      call mulbac2(temp,u,bo,mu,bc,gblclr,ieo,ibleo,vecbl,vecblinv,myid,nn, &
+4874c5013
+<      call gammamultshort(temp(:,:,:,ieo,ibleo), gtemp, 5) ! multiply by gamma5
+---
+>      call gammamultshort(temp, gtemp, 5) ! multiply by gamma5
+4882c5021
+<      call mulbac2(temp(:,:,:,ieo,ibleo),u,be,mu,bc,gblclr,ieo,ibleo,vecbl,vecblinv,myid,nn, &
+---
+>      call mulbac2(temp,u,be,mu,bc,gblclr,ieo,ibleo,vecbl,vecblinv,myid,nn, &
+4884c5023
+<      call gammamultshort(temp(:,:,:,ieo,ibleo), gtemp, 5) ! multiply by gamma5
+---
+>      call gammamultshort(temp, gtemp, 5) ! multiply by gamma5
+4902,4903c5041,5042
+<      call gammamultshort(gtemp, temp(:,:,:,ieo,ibleo), 5)                 ! multiply by gamma5
+<      call vv(xe(:,:,:,ieo,ibleo),temp(:,:,:,ieo,ibleo),Je(:,:,mu+5))
+---
+>      call gammamultshort(gtemp, temp, 5)                 ! multiply by gamma5
+>      call vv(xe(:,:,:,ieo,ibleo),temp,Je(:,:,mu+5))
+4905,4906c5044,5045
+<      call gammamultshort(gtemp, temp(:,:,:,ieo,ibleo), 5)                 ! multiply by gamma5
+<      call vv(xo(:,:,:,ieo,ibleo),temp(:,:,:,ieo,ibleo),Jo(:,:,mu+5))
+---
+>      call gammamultshort(gtemp, temp, 5)                 ! multiply by gamma5
+>      call vv(xo(:,:,:,ieo,ibleo),temp,Jo(:,:,mu+5))
+4914c5053
+<  end subroutine eigloopops
+---
+>  end subroutine eigloopops_original
+4918,4920c5057,5064
+< 
+< ! THIS FUNCTION WORKS EXACTLY LIKE eigloopops() EXCEPT THAT I USE IT FOR 
+< ! EXPERIEMNTING TO KEEP VIC'S CODE INTACT -Abdou
+---
+> ! THIS FUNCTION WORKS EXACTLY LIKE loopops() EXCEPT THAT THE SOURCE VECTOR
+> ! IS EXPECTED TO HOLD THE SOLUTION OF gamma5Mx'=z NOT Mx=z FOR USE WITH THE
+> ! HERMITIAN FORCED EIGENSPECTRUM SUBTRACTION TECHNIQUE
+> ! NOTE: source vector is "b" and noise vector is "x"
+>  subroutine eigloopops(ksub,xe,xo,u,be,bo,Je,Jo,ieo,ibleo,bc,vecbl,vecblinv, &
+>                     myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+> ! This is a modification of the original version written by Vic because I think 
+> ! gamma_5 multiplication has to be done before the multiplication with the operator.
+4922,4923c5066,5072
+< ! Changes w.r.t. eigloopops:
+< !    - the noise vector need to be multiplied by gamma5 first before applying the operator
+---
+> ! what we want is b^dagger Gamma_5 *O * xprime  where M*xprime=gamma_5*b
+> ! For coding reasons we calculate the hermitian conjugate of this quantity
+> ! then take the complex conjugate. When we take the Hermitian conjugate,
+> ! we get xprime^dagge* O^dagger*Gamma_5*b
+> !
+> ! -AA 11/28/2012
+> 
+4925,4926d5073
+<  subroutine eigloopops_abdou(ksub,xe,xo,u,be,bo,Je,Jo,ieo,ibleo,bc,vecbl,vecblinv, &
+<                     myid,nn,ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+4947c5094
+< !        expected size: Je(2,nvhalf,9), Jo(2,nvhalf,9)
+---
+> !        expected size: Je(2,nvhalf,5), Jo(2,nvhalf,5)
+4966c5113
+<     real(kind=KR), dimension(6,ntotal,4,2,8) :: temp,gbe,gbo
+---
+>     real(kind=KR), dimension(6,nvhalf,4) :: temp
+4968,4970c5115
+<     integer(kind=KI) :: id, isite, ibl, jeo, jbleo;
+< 
+< 
+---
+>     integer(kind=KI) :: id, isite, ibl
+4975,4982d5119
+< !*Multiply the souce by gamma5
+<     do jeo=1,2
+<      do jbleo=1,8
+<        call gammamult(be, bo, gbe, gbo, 5,jeo,jbleo)
+<      enddo
+<     enddo
+< 
+< 
+4992,4998c5129,5136
+<      ! using gbe and gbo --Abdou
+<      !call mulfor2(temp(:,:,:,ieo,ibleo),u,be,mu,gblclr,ieo,ibleo,vecbl)
+<      !call gammamultshort(temp(:,:,:,ieo,ibleo), gtemp, 5) ! multiply by gamma5
+<      !call vgv(xo,gtemp,Je(:,:,mu),gblclr,ieo,ibleo,mu,bc,vecbl,vecblinv, &
+<      !         lbd,ldiv,ib,lvbc,nms,myid,nn,iblv,MRT)
+<      call mulfor2(temp(:,:,:,ieo,ibleo),u,gbe,mu,gblclr,ieo,ibleo,vecbl)
+<      call vgv(xo,temp(:,:,:,ieo,ibleo),Je(:,:,mu),gblclr,ieo,ibleo,mu,bc,vecbl,vecblinv, &
+---
+>      !call mulfor2(temp,u,be,mu,gblclr,ieo,ibleo,vecbl)
+>      !call gammamultshort(temp, gtemp, 5) ! multiply by gamma5
+>      !call gammamultshort(be(:,:,:,ieo,ibleo), temp, 5) ! multiply by gamma5
+>      !call mulfor2(gtemp,u,temp,mu,gblclr,ieo,ibleo,vecbl)
+>      call mulfor3(temp,u,be,mu,gblclr,ieo,ibleo,vecbl)
+>      temp(:,:,:)=-temp(:,:,:)
+>      call gammamultshort(temp, gtemp, 5) ! multiply by gamma5
+>      call vgv(xo,gtemp,Je(:,:,mu),gblclr,ieo,ibleo,mu,bc,vecbl,vecblinv, &
+5006,5011c5144,5151
+<      !call mulfor2(temp(:,:,:,ieo,ibleo),u,bo,mu,gblclr,ieo,ibleo,vecbl)
+<      !call gammamultshort(temp(:,:,:,ieo,ibleo), gtemp, 5) ! multiply by gamma5
+<      !call vgv(xe,gtemp,Jo(:,:,mu),gblclr,ieo,ibleo,mu,bc,vecbl,vecblinv, &
+<      !         lbd,ldiv,ib,lvbc,nms,myid,nn,iblv,MRT)
+<      call mulfor2(temp(:,:,:,ieo,ibleo),u,gbo,mu,gblclr,ieo,ibleo,vecbl)
+<      call vgv(xe,temp(:,:,:,ieo,ibleo),Jo(:,:,mu),gblclr,ieo,ibleo,mu,bc,vecbl,vecblinv, &
+---
+>      !call mulfor2(temp,u,bo,mu,gblclr,ieo,ibleo,vecbl)
+>      !call gammamultshort(temp, gtemp, 5) ! multiply by gamma5
+>      !call gammamultshort(bo(:,:,:,ieo,ibleo), temp, 5) ! multiply by gamma5
+>      !call mulfor2(gtemp,u,temp,mu,gblclr,ieo,ibleo,vecbl)
+>      call mulfor3(temp,u,bo,mu,gblclr,ieo,ibleo,vecbl)
+>      temp(:,:,:)=-temp(:,:,:)
+>      call gammamultshort(temp, gtemp, 5) ! multiply by gamma5
+>      call vgv(xe,gtemp,Jo(:,:,mu),gblclr,ieo,ibleo,mu,bc,vecbl,vecblinv, &
+5019c5159,5163
+<      !call mulbac2(temp(:,:,:,ieo,ibleo),u,bo,mu,bc,gblclr,ieo,ibleo,vecbl,vecblinv,myid,nn, &
+---
+>      !call mulbac2(temp,u,bo,mu,bc,gblclr,ieo,ibleo,vecbl,vecblinv,myid,nn, &
+>      !             ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>      !call gammamultshort(temp, gtemp, 5) ! multiply by gamma5
+>      !call gammamultshort(bo(:,:,:,ieo,ibleo), temp, 5) ! multiply by gamma5
+>      !call mulbac2(gtemp,u,temp,mu,bc,gblclr,ieo,ibleo,vecbl,vecblinv,myid,nn, &
+5021,5023c5165
+<      !call gammamultshort(temp(:,:,:,ieo,ibleo), gtemp, 5) ! multiply by gamma5
+<      !call vv(xe(:,:,:,ieo,ibleo),gtemp,Je(:,:,mu))
+<      call mulbac2(temp(:,:,:,ieo,ibleo),u,gbo,mu,bc,gblclr,ieo,ibleo,vecbl,vecblinv,myid,nn, &
+---
+>      call mulbac3(temp,u,bo,mu,bc,gblclr,ieo,ibleo,vecbl,vecblinv,myid,nn, &
+5025c5167,5168
+<      call vv(xe(:,:,:,ieo,ibleo),temp(:,:,:,ieo,ibleo),Je(:,:,mu))
+---
+>      call gammamultshort(temp, gtemp, 5) ! multiply by gamma5
+>      call vv(xe(:,:,:,ieo,ibleo),gtemp,Je(:,:,mu))
+5032c5175,5179
+<      !call mulbac2(temp(:,:,:,ieo,ibleo),u,be,mu,bc,gblclr,ieo,ibleo,vecbl,vecblinv,myid,nn, &
+---
+>      !call mulbac2(temp,u,be,mu,bc,gblclr,ieo,ibleo,vecbl,vecblinv,myid,nn, &
+>      !             ldiv,nms,lvbc,ib,lbd,iblv,MRT)
+>      !call gammamultshort(temp, gtemp, 5) ! multiply by gamma5
+>      !call gammamultshort(be(:,:,:,ieo,ibleo), temp, 5) ! multiply by gamma5
+>      !call mulbac2(gtemp,u,temp,mu,bc,gblclr,ieo,ibleo,vecbl,vecblinv,myid,nn, &
+5034,5036c5181
+<      !call gammamultshort(temp(:,:,:,ieo,ibleo), gtemp, 5) ! multiply by gamma5
+<      !call vv(xo(:,:,:,ieo,ibleo),gtemp,Jo(:,:,mu))
+<      call mulbac2(temp(:,:,:,ieo,ibleo),u,gbe,mu,bc,gblclr,ieo,ibleo,vecbl,vecblinv,myid,nn, &
+---
+>      call mulbac3(temp,u,be,mu,bc,gblclr,ieo,ibleo,vecbl,vecblinv,myid,nn, &
+5038c5183,5184
+<      call vv(xo(:,:,:,ieo,ibleo),temp(:,:,:,ieo,ibleo),Jo(:,:,mu))
+---
+>      call gammamultshort(temp, gtemp, 5) ! multiply by gamma5
+>      call vv(xo(:,:,:,ieo,ibleo),gtemp,Jo(:,:,mu))
+5047,5050d5192
+<     !call gammamultshort(be(:,:,:,ieo,ibleo), gtemp, 5) ! multiply by gamma5
+<     !call vv(xe(:,:,:,ieo,ibleo),gtemp,Je(:,:,5))
+<     !call gammamultshort(bo(:,:,:,ieo,ibleo), gtemp, 5) ! multiply by gamma5
+<     !call vv(xo(:,:,:,ieo,ibleo),gtemp,Jo(:,:,5))
+5059,5062c5201,5207
+<      !call gammamultshort(gtemp, temp(:,:,:,ieo,ibleo), 5)                 ! multiply by gamma5
+<      !call vv(xe(:,:,:,ieo,ibleo),temp(:,:,:,ieo,ibleo),Je(:,:,mu+5))
+<      call gammamultshort(gbe(:,:,:,ieo,ibleo), gtemp, mu) ! multiply by gamma_mu
+<      call vv(xe(:,:,:,ieo,ibleo),gtemp,Je(:,:,mu+5))
+---
+>      !call gammamultshort(gtemp, temp, 5)                 ! multiply by gamma5
+>      !call gammamultshort(be(:,:,:,ieo,ibleo),temp, 5)                 ! multiply by gamma5
+>      !call gammamultshort(temp, gtemp, mu) ! multiply by gamma_mu
+>      call gammamultshort(be(:,:,:,ieo,ibleo), gtemp, mu) ! multiply by gamma_mu
+>      call gammamultshort(gtemp, temp, 5)                 ! multiply by gamma5
+>      temp(:,:,:)=-temp(:,:,:)
+>      call vv(xe(:,:,:,ieo,ibleo),temp,Je(:,:,mu+5))
+5064,5067c5209,5215
+<      !call gammamultshort(gtemp, temp(:,:,:,ieo,ibleo), 5)                 ! multiply by gamma5
+<      !call vv(xo(:,:,:,ieo,ibleo),temp(:,:,:,ieo,ibleo),Jo(:,:,mu+5))
+<      call gammamultshort(gbo(:,:,:,ieo,ibleo), gtemp, mu) ! multiply by gamma_mu
+<      call vv(xo(:,:,:,ieo,ibleo),gtemp,Jo(:,:,mu+5))
+---
+>      !call gammamultshort(gtemp, temp, 5)                 ! multiply by gamma5
+>      !call gammamultshort(bo(:,:,:,ieo,ibleo), temp, 5)                 ! multiply by gamma5
+>      !call gammamultshort(temp, gtemp, mu)                 ! multiply by gamma_mu
+>      call gammamultshort(bo(:,:,:,ieo,ibleo), gtemp, mu) ! multiply by gamma_mu
+>      call gammamultshort(gtemp, temp, 5)                 ! multiply by gamma5
+>      temp(:,:,:)=-temp(:,:,:)
+>      call vv(xo(:,:,:,ieo,ibleo),temp,Jo(:,:,mu+5))
+5075,5076c5223
+<  end subroutine eigloopops_abdou
+< !-------------------------------------------------------------------------------------------------------
+---
+>  end subroutine eigloopops
+5172a5320,5324
+> 
+> 
+> 
+> 
+> 
